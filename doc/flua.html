@@ -122,7 +122,7 @@ lang="en" xml:lang="en">
 <body>
 <div id="content">
 
-<h1 class="title">Fortran 2003 Lua - Simple API</h1>
+<h1 class="title">Fortran 2003 Lua API</h1>
 
 
 <p>
@@ -163,7 +163,7 @@ into Fortran data structures.
 
 
 <pre class="src src-f90"><span class="org-keyword">PROGRAM</span> <span class="org-function-name">noop</span>
-  <span class="org-keyword">USE</span> <span class="org-function-name">f2k3_lua_simple</span>
+  <span class="org-keyword">USE</span> <span class="org-function-name">flua</span>
   <span class="org-keyword">USE</span> <span class="org-function-name">ISO_C_BINDING</span>, <span class="org-keyword">ONLY</span>: <span class="org-constant">C_PTR</span>
 
   <span class="org-keyword">IMPLICIT</span> <span class="org-type">NONE</span>
@@ -180,7 +180,7 @@ which can be compiled, given that you are in <code>test/</code> and the build
 dir is <code>build/</code>
 </p><pre class="example">
 gfortran noop.f90 -o noop -I ../buid/include \
-  -l lua -l f2k3_lua_simple -L ../../build/lib
+  -l lua -l flua -L ../../build/lib
 </pre>
 
 <p>If you run it via <code>./noop</code> nothing should happen, which means it at
@@ -198,7 +198,7 @@ least doesn't crash.
 
 
 <pre class="src src-f90"><span class="org-keyword">PROGRAM</span> <span class="org-function-name">dofile</span>
-  <span class="org-keyword">USE</span> <span class="org-function-name">f2k3_lua_simple</span>
+  <span class="org-keyword">USE</span> <span class="org-function-name">flua</span>
   <span class="org-keyword">USE</span> <span class="org-function-name">ISO_C_BINDING</span>, <span class="org-keyword">ONLY</span>: <span class="org-constant">C_PTR</span>
 
   <span class="org-keyword">IMPLICIT</span> <span class="org-type">NONE</span>
@@ -367,7 +367,7 @@ of the code you'll write, as we are about to so see.
 
 
 <pre class="src src-f90"><span class="org-keyword">PROGRAM</span> <span class="org-function-name">get_val</span>
-  <span class="org-keyword">USE</span> <span class="org-function-name">f2k3_lua_simple</span>
+  <span class="org-keyword">USE</span> <span class="org-function-name">flua</span>
   <span class="org-keyword">USE</span> <span class="org-function-name">ISO_C_BINDING</span>, <span class="org-keyword">ONLY</span>: <span class="org-constant">C_PTR</span>
 
   <span class="org-keyword">IMPLICIT</span> <span class="org-type">NONE</span>
