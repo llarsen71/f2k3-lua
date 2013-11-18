@@ -2,7 +2,7 @@
 ! Licensed under the MIT license, see LICENSE file.
 
 PROGRAM test
-  USE f2k3_lua_simple
+  USE flua
   USE ISO_C_BINDING
   USE ISO_FORTRAN_ENV
   IMPLICIT NONE
@@ -20,13 +20,12 @@ PROGRAM test
   END IF
   !
   CALL luaL_newstate(L)
-  CALL f2k3lua_registersafeprint(L)
-  CALL f2k3lua_opensandboxlibs(L);
+  CALL flua_opensandboxlibs(L);
   IF( error > 0 ) GOTO 9999
   CALL luaL_dofile(L, "conf.lua", error)
   IF(error > 0) THEN
     buf = " "
-    CALL lua_tostring(L, -1, buf)
+    CALL flua_tostring(L, -1, buf)
     print * , TRIM(buf)
     GOTO 9999
   END IF
@@ -37,7 +36,7 @@ PROGRAM test
     GOTO 9999
   END IF
   buf = " "
-  CALL lua_tostring(L, -1, buf)
+  CALL flua_tostring(L, -1, buf)
   CALL lua_pop(L, 1) ! pop string from lua stack
 
   CALL lua_getglobal(L, "answer")
