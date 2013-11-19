@@ -13,8 +13,6 @@ PROGRAM test
   !
   L = luaL_newstate()
   CALL flua_opensandboxlibs(L);
-  IF( error > 0 ) GOTO 9999
-
 
   CALL luaL_dostring(L, &
   'foo = "test"' //nl//&
@@ -105,6 +103,7 @@ PROGRAM test
   !
   !
   !
+  continue
 9999 CONTINUE
   CALL lua_close(L)
   print *, error

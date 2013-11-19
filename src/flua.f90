@@ -1171,7 +1171,7 @@ SUBROUTINE stackDump(L)
   INTEGER :: i, top, t
 
   top = lua_gettop(L)
-  WRITE(6, "(A)") "start stack:"
+  WRITE(6, "(A)") "***start stack***"
   DO i = 1,top
     t = lua_type(L, i)
     SELECT CASE (t)
@@ -1186,7 +1186,7 @@ SUBROUTINE stackDump(L)
         WRITE(6, "(A)") cStr2fSTR(lua_typename(L, t))
     END SELECT
   END DO
-  WRITE(6, "(A)") "end stack"
+  WRITE(6, "(A)") "***end  stack***"
 END SUBROUTINE stackDump
 
 !=====================================================================
