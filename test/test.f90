@@ -4,7 +4,6 @@
 PROGRAM test
   USE flua
   USE ISO_C_BINDING
-  USE ISO_FORTRAN_ENV
   IMPLICIT NONE
   !
   TYPE(C_PTR) :: L
@@ -12,7 +11,7 @@ PROGRAM test
   CHARACTER(LEN=1024) :: buf
   CHARACTER*2 :: nl = CHAR(13) // CHAR(10)
   !
-  CALL luaL_newstate(L)
+  L = luaL_newstate()
   CALL flua_opensandboxlibs(L);
   IF( error > 0 ) GOTO 9999
 
