@@ -7,22 +7,38 @@ PROGRAM test
   USE ISO_FORTRAN_ENV
   IMPLICIT NONE
   !
-  TYPE(C_PTR) :: L, CString
-  INTEGER :: error, ioStat, i
-  LOGICAL :: file_exists
+  TYPE(C_PTR) :: L
+  INTEGER :: error
   CHARACTER(LEN=1024) :: buf
-  ! ====================================================================
-  INQUIRE(FILE="conf.lua", EXIST=file_exists)
-  IF( .NOT. file_exists ) THEN
-    PRINT *, "[ERROR] file conf.lua doesn't exist."
-    CALL p_reportExitCode(1)    
-    GOTO 9999
-  END IF
+  CHARACTER*2 :: nl = CHAR(13) // CHAR(10)
   !
   CALL luaL_newstate(L)
   CALL flua_opensandboxlibs(L);
   IF( error > 0 ) GOTO 9999
-  CALL luaL_dofile(L, "conf.lua", error)
+
+
+  CALL luaL_dostring(L, &
+  'foo = "test"' //nl//&
+  'bar = "test2"' //nl//&
+  'buzz = "hundkatemaus"' //nl//&
+  '' //nl//&
+  'answer = 42' //nl//&
+  '' //nl//&
+  'myArray = {' //nl//&
+  '   "foo",' //nl//&
+  '   "bar"' //nl//&
+  '}' //nl//&
+  '' //nl//&
+  'myTable = {' //nl//&
+  '   foo = "bar",' //nl//&
+  '   fuzz = "buss"' //nl//&
+  '}' //nl//&
+  '' //nl//&
+  'for i in ipairs(myArray) do' //nl//&
+  '   print(i)' //nl//&
+  'end', &
+  error)
+
   IF(error > 0) THEN
     buf = " "
     CALL flua_tostring(L, -1, buf)
@@ -78,7 +94,7 @@ PROGRAM test
   END DO
   !
   CALL lua_getfield(L, -1, "foo")
-  CALL stackDump(L)  
+  CALL stackDump(L)
   CALL lua_pop(L, 1) ! pop value of "foo"
   CALL lua_getfield(L, -1, "fuzz")
   CALL stackDump(L)
@@ -91,7 +107,7 @@ PROGRAM test
   !
   !
 9999 CONTINUE
-  CALL lua_close(L)  
+  CALL lua_close(L)
   print *, error
   !
 CONTAINS
