@@ -565,7 +565,7 @@ INTERFACE
     INTEGER(KIND=C_INT), VALUE :: idx
   END SUBROUTINE lua_setfenv
 
-  !===================================================================
+!===================================================================
   !
   !
   !> LUA_API int   (lua_next) (lua_State *L, int idx);
@@ -661,9 +661,8 @@ SUBROUTINE p_characterToCharArray(fstr, charArray, error)
   CHARACTER(LEN=*), INTENT(IN) :: fstr
   CHARACTER(KIND=C_CHAR, LEN=1), DIMENSION(:), INTENT(OUT) :: charArray
   INTEGER, INTENT(OUT) :: error
-  !
   INTEGER :: i, lenTrim
-  ! ====================================================================
+
   lenTrim = LEN_TRIM(fstr)
   error = 0
   IF(SIZE(charArray) < (lenTrim + 1)) THEN
@@ -677,6 +676,8 @@ SUBROUTINE p_characterToCharArray(fstr, charArray, error)
   charArray(lenTrim+1) = C_NULL_CHAR
 END SUBROUTINE p_characterToCharArray
 
+!=====================================================================
+
 SUBROUTINE C_F_CSTR(cptr, ret, length, as_cSTR)
   USE ISO_C_BINDING
   IMPLICIT NONE
@@ -684,7 +685,6 @@ SUBROUTINE C_F_CSTR(cptr, ret, length, as_cSTR)
   CHARACTER(KIND=C_CHAR), DIMENSION(:), POINTER :: ret
   INTEGER, INTENT(OUT) :: length
   LOGICAL, OPTIONAL, INTENT(IN) :: as_cSTR
-  !
   INTERFACE
     FUNCTION strlen(cstr_) BIND(C,NAME="strlen")
       USE ISO_C_BINDING
@@ -693,7 +693,7 @@ SUBROUTINE C_F_CSTR(cptr, ret, length, as_cSTR)
       TYPE(C_PTR), VALUE :: cstr_
     END FUNCTION strlen
   END INTERFACE
-  ! ====================================================================
+
   length = strlen(CPTR)
   IF (PRESENT(as_cSTR)) THEN
     IF (as_cSTR) THEN
@@ -706,6 +706,8 @@ SUBROUTINE C_F_CSTR(cptr, ret, length, as_cSTR)
   ! fortran pointers.
   CALL C_F_POINTER(FPTR=ret, CPTR=cptr, SHAPE=(/ length /))
 END SUBROUTINE
+
+!=====================================================================
 
 SUBROUTINE flua_tostring(L, n, str)
   USE ISO_C_BINDING, ONLY: C_PTR, C_SIZE_T, C_CHAR
@@ -727,6 +729,8 @@ SUBROUTINE flua_tostring(L, n, str)
     str(i:i) = fstr(i)
   END DO
 END SUBROUTINE flua_tostring
+
+!=====================================================================
 
 FUNCTION lua_tostring(L, n)
 ! Returns the Lua string that is at the given stack position.
@@ -755,6 +759,8 @@ FUNCTION lua_tostring(L, n)
   END DO
 END FUNCTION lua_tostring
 
+!=====================================================================
+
 FUNCTION lua_typename(L, typeid)
   USE ISO_C_BINDING, ONLY: C_PTR, C_SIZE_T
   IMPLICIT NONE
@@ -775,6 +781,8 @@ FUNCTION lua_typename(L, typeid)
   END DO
 END FUNCTION lua_typename
 
+!=====================================================================
+
 SUBROUTINE lua_getglobal(L, key)
   USE ISO_C_BINDING, ONLY: C_PTR, C_CHAR, C_NULL_CHAR
   IMPLICIT NONE
@@ -784,6 +792,8 @@ SUBROUTINE lua_getglobal(L, key)
   CALL lua_getfield(L, LUA_GLOBALSINDEX, key)
 END SUBROUTINE lua_getglobal
 
+!=====================================================================
+
 SUBROUTINE lua_setglobal(L, key)
   USE ISO_C_BINDING, ONLY: C_PTR, C_CHAR, C_NULL_CHAR
   IMPLICIT NONE
@@ -792,6 +802,8 @@ SUBROUTINE lua_setglobal(L, key)
   !
   CALL lua_setfield(L,  LUA_GLOBALSINDEX, key)
 END SUBROUTINE lua_setglobal
+
+!=====================================================================
 
 FUNCTION flua_checkglobal(L, key) RESULT(has_globalvar)
 ! Check whether a global value exists. If it does, leave it on the
@@ -831,6 +843,8 @@ FUNCTION lua_isfunction(L, n)
   lua_isfunction = (lua_type(L, n) == LUA_TFUNCTION)
 END FUNCTION lua_isfunction
 
+!=====================================================================
+
 !#define lua_istable(L,n)	(lua_type(L, (n)) == LUA_TTABLE)
 FUNCTION lua_istable(L, n)
   USE ISO_C_BINDING, ONLY: C_PTR
@@ -841,6 +855,8 @@ FUNCTION lua_istable(L, n)
 
   lua_istable = (lua_type(L,  n) == LUA_TTABLE)
 END FUNCTION lua_istable
+
+!=====================================================================
 
 !#define lua_islightuserdata(L,n)	(lua_type(L, (n)) == LUA_TLIGHTUSERDATA)
 FUNCTION lua_islightuserdata(L, n)
@@ -853,6 +869,8 @@ FUNCTION lua_islightuserdata(L, n)
   lua_islightuserdata = (lua_type(L,  n) == LUA_TLIGHTUSERDATA)
 END FUNCTION lua_islightuserdata
 
+!=====================================================================
+
 !#define lua_isnil(L,n)		(lua_type(L, (n)) == LUA_TNIL)
 FUNCTION lua_isnil(L, n)
   USE ISO_C_BINDING, ONLY: C_PTR
@@ -863,6 +881,8 @@ FUNCTION lua_isnil(L, n)
 
   lua_isnil = (lua_type(L,  n) == LUA_TNIL)
 END FUNCTION lua_isnil
+
+!=====================================================================
 
 !#define lua_isboolean(L,n)	(lua_type(L, (n)) == LUA_TBOOLEAN)
 FUNCTION lua_isboolean(L, n)
@@ -875,6 +895,8 @@ FUNCTION lua_isboolean(L, n)
   lua_isboolean = (lua_type(L,  n) == LUA_TBOOLEAN)
 END FUNCTION
 
+!=====================================================================
+
 !#define lua_isthread(L,n)	(lua_type(L, (n)) == LUA_TTHREAD)
 FUNCTION lua_isthread(L, n)
   USE ISO_C_BINDING, ONLY: C_PTR
@@ -885,6 +907,8 @@ FUNCTION lua_isthread(L, n)
 
   lua_isthread = (lua_type(L,  n) == LUA_TTHREAD)
 END FUNCTION
+
+!=====================================================================
 
 !#define lua_isnone(L,n)		(lua_type(L, (n)) == LUA_TNONE)
 FUNCTION lua_isnone(L, n)
@@ -897,6 +921,8 @@ FUNCTION lua_isnone(L, n)
   lua_isnone = (lua_type(L,  n) == LUA_TNONE)
 END FUNCTION
 
+!=====================================================================
+
 !#define lua_isnoneornil(L, n)	(lua_type(L, (n)) <= 0)
 FUNCTION lua_isnoneornil(L, n)
   USE ISO_C_BINDING, ONLY: C_PTR
@@ -908,6 +934,8 @@ FUNCTION lua_isnoneornil(L, n)
   lua_isnoneornil = (lua_type(L,  n) <= 0)
 END FUNCTION
 
+!=====================================================================
+
 FUNCTION lua_isnumber(L, n)
   USE ISO_C_BINDING, ONLY: C_PTR
   IMPLICIT NONE
@@ -918,6 +946,8 @@ FUNCTION lua_isnumber(L, n)
   lua_isnumber = lua_isnumber_c(L,  n) /= 0
 END FUNCTION lua_isnumber
 
+!=====================================================================
+
 FUNCTION lua_isstring(L, n)
   USE ISO_C_BINDING, ONLY: C_PTR
   IMPLICIT NONE
@@ -927,6 +957,8 @@ FUNCTION lua_isstring(L, n)
   !
   lua_isstring = lua_isstring_c(L,  n) /= 0
 END FUNCTION lua_isstring
+
+!=====================================================================
 
 FUNCTION lua_tointeger(L, n)
   USE ISO_C_BINDING, ONLY: C_PTR
@@ -953,6 +985,8 @@ SUBROUTINE lua_pushinteger(L, val)
   CALL lua_pushnumber(L, valD)
 END SUBROUTINE lua_pushinteger
 
+!=====================================================================
+
 SUBROUTINE lua_pop(L, n)
   USE ISO_C_BINDING, ONLY: C_PTR
   IMPLICIT NONE
@@ -962,6 +996,8 @@ SUBROUTINE lua_pop(L, n)
   CALL lua_settop(L, -n-1)
 END SUBROUTINE lua_pop
 
+!=====================================================================
+
 SUBROUTINE lua_pushstring(L, str)
   USE ISO_C_BINDING, ONLY: C_PTR, C_CHAR
   IMPLICIT NONE
@@ -970,13 +1006,15 @@ SUBROUTINE lua_pushstring(L, str)
   !
   CHARACTER(LEN=1, KIND=C_CHAR), DIMENSION(LEN_TRIM(str)+1) :: cstr_
   INTEGER :: error
-  ! ====================================================================
+
   CALL p_characterToCharArray(str, cstr_, error)
   ! error cannot be /= 0
   !
   CALL lua_pushstring_c(L, cstr_)
   !
 END SUBROUTINE lua_pushstring
+
+!=====================================================================
 
 SUBROUTINE lua_pushtable(L)
   USE ISO_C_BINDING, ONLY: C_PTR
@@ -986,6 +1024,8 @@ SUBROUTINE lua_pushtable(L)
   ! Add a new table to the stack.
   CALL lua_createtable(L, 0, 0)
 END SUBROUTINE lua_pushtable
+
+!=====================================================================
 
 !> #define lua_newtable(L)		lua_createtable(L, 0, 0)
 SUBROUTINE lua_newtable(L, tablename)
@@ -1009,6 +1049,8 @@ SUBROUTINE lua_newtable(L, tablename)
   ENDIF
 END SUBROUTINE lua_newtable
 
+!=====================================================================
+
 FUNCTION lua_next(L, n)
   USE ISO_C_BINDING, ONLY: C_PTR
   IMPLICIT NONE
@@ -1019,6 +1061,8 @@ FUNCTION lua_next(L, n)
   lua_next = lua_next_c(L, n) /= 0
 END FUNCTION lua_next
 
+!=====================================================================
+
 SUBROUTINE lua_pushcfunction(L, fn)
   USE ISO_C_BINDING, ONLY: C_PTR, C_FUNPTR
   IMPLICIT NONE
@@ -1027,6 +1071,8 @@ SUBROUTINE lua_pushcfunction(L, fn)
   !
   call lua_pushcclosure(L, fn, 0)
 END SUBROUTINE lua_pushcfunction
+
+!=====================================================================
 
 SUBROUTINE lua_getfield(L, n, k)
   USE ISO_C_BINDING, ONLY: C_PTR, C_CHAR, C_NULL_CHAR
@@ -1037,12 +1083,14 @@ SUBROUTINE lua_getfield(L, n, k)
   !
   CHARACTER(LEN=1, KIND=C_CHAR), DIMENSION(LEN_TRIM(k)+1) :: c_key
   INTEGER :: error
-  ! ====================================================================
+
   CALL p_characterToCharArray(k, c_key, error)
   ! error cannot be /= 0
   !
   CALL lua_getfield_c(L, n, c_key)
 END SUBROUTINE lua_getfield
+
+!=====================================================================
 
 !> LUA_API void  (lua_setfield) (lua_State *L, int idx, const char *k);
 SUBROUTINE lua_setfield(L, idx, k)
@@ -1060,6 +1108,8 @@ SUBROUTINE lua_setfield(L, idx, k)
   !
   CALL lua_setfield_c(L, idx, c_key)
 END SUBROUTINE lua_setfield
+
+!=====================================================================
 
 !> #define luaL_dofile(L, fn) (luaL_loadfile(L, fn) || lua_pcall(L, 0, LUA_MULTRET, 0))
 SUBROUTINE luaL_dofile(L, fileName, error)
@@ -1084,6 +1134,8 @@ SUBROUTINE luaL_dofile(L, fileName, error)
     ENDIF
   ENDIF
 END SUBROUTINE luaL_dofile
+
+!=====================================================================
 
 !> #define luaL_dostring(L, s) (luaL_loadstring(L, s) || lua_pcall(L, 0, LUA_MULTRET, 0))
 SUBROUTINE luaL_dostring(L, script, error)
@@ -1110,6 +1162,8 @@ SUBROUTINE luaL_dostring(L, script, error)
   ENDIF
 END SUBROUTINE luaL_dostring
 
+!=====================================================================
+
 SUBROUTINE stackDump(L)
   USE ISO_C_BINDING
   IMPLICIT NONE
@@ -1135,6 +1189,8 @@ SUBROUTINE stackDump(L)
   WRITE(6, "(A)") "end stack"
 END SUBROUTINE stackDump
 
+!=====================================================================
+
 !void dumpTable(lua_State* L, int idx)
 !{
 !  lua_pushnil(L);  /* first key */
@@ -1153,6 +1209,7 @@ END SUBROUTINE stackDump
 !  free(ptr);
 !}
 
+!=====================================================================
 
 !#define luaL_checkstring(L,n)	(luaL_checklstring(L, (n), NULL))
 SUBROUTINE luaL_checkstring(L, n, fstr, error)
@@ -1180,6 +1237,8 @@ SUBROUTINE luaL_checkstring(L, n, fstr, error)
   END DO
 END SUBROUTINE luaL_checkstring
 
+!=====================================================================
+
 SUBROUTINE flua_registerfunction(L, fnname, fn)
   USE ISO_C_BINDING, ONLY: C_PTR, C_FUNPTR
   IMPLICIT NONE
@@ -1194,6 +1253,8 @@ SUBROUTINE flua_registerfunction(L, fnname, fn)
   CALL lua_setglobal(L, fnname);
 END SUBROUTINE flua_registerfunction
 
+!=====================================================================
+
 SUBROUTINE flua_opensandboxlibs(L)
   USE ISO_C_BINDING, ONLY: C_PTR
   IMPLICIT NONE
@@ -1201,6 +1262,8 @@ SUBROUTINE flua_opensandboxlibs(L)
 
   call luaL_openlibs(L)
 END SUBROUTINE flua_opensandboxlibs
+
+!=====================================================================
 
 FUNCTION getTblField(L, fieldname, type_, tableidx)
 !
@@ -1236,5 +1299,7 @@ FUNCTION getTblField(L, fieldname, type_, tableidx)
 
   getTblField = .TRUE.
 END FUNCTION getTblField
+
+!=====================================================================
 
 END MODULE flua
