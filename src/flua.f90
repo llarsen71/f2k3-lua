@@ -2,10 +2,13 @@
 ! Licensed under the MIT license, see LICENSE file.
 
 module flua
-  use ISO_C_BINDING, only: C_CHAR
+  use ISO_C_BINDING, only: C_CHAR, C_INT
   private :: p_characterToCharArray
   integer, PARAMETER :: LUA_MULTRET = -1
-  integer, PARAMETER :: LUA_GLOBALSINDEX = -10002
+
+  integer, PARAMETER :: LUA_REGISTRYINDEX = -10000
+  integer, PARAMETER :: LUA_ENVIRONINDEX  = -10001
+  integer, PARAMETER :: LUA_GLOBALSINDEX  = -10002
 
   ! LUA types
   integer, PARAMETER :: LUA_TNONE = -1
@@ -22,6 +25,9 @@ module flua
   type cStrPTR
     character(kind=C_CHAR, len=1), dimension(:), pointer :: str
   end type cStrPTR
+
+  integer(kind=C_INT) :: default_errfunc = 0
+  character*2 :: nwln = CHAR(13) // CHAR(10)
 
 interface
   !===================================================================
@@ -78,13 +84,13 @@ interface
   !
   !
   !> LUA_API int   (lua_pcall) (lua_State *L, int nargs, int nresults, int errfunc);
-  function lua_pcall(L, nargs, nresults, errfunc) bind(C, name="lua_pcall")
+  function lua_pcall_c(L, nargs, nresults, errfunc) bind(C, name="lua_pcall")
     use ISO_C_BINDING, only: C_PTR, C_INT
     implicit none
     type(C_PTR), value :: L
     integer(kind=C_INT), value :: nargs, nresults, errfunc
-    integer(kind=C_INT) :: lua_pcall
-  end function lua_pcall
+    integer(kind=C_INT) :: lua_pcall_c
+  end function lua_pcall_c
 
   !===================================================================
   ! Basic Stack Manipulation
@@ -426,6 +432,25 @@ interface
   end subroutine lua_pushlightuserdata
 
 !> LUA_API int   (lua_pushthread) (lua_State *L);
+  !
+  !
+  !> LUALIB_API int (luaL_ref) (lua_State *L, int t);
+  function luaL_ref(L, tblidx) bind(C, name="luaL_ref")
+    use ISO_C_BINDING, only: C_PTR, C_INT
+    implicit none
+    type(C_PTR), value :: L
+    integer(kind=C_INT) :: tblidx
+    integer(kind=C_INT) :: luaL_ref
+  end function luaL_ref
+  !
+  !
+  !> LUALIB_API void (luaL_unref) (lua_State *L, int t, int ref);
+  subroutine luaL_unref(L, tblidx, ref) bind(C, name="luaL_unref")
+    use ISO_C_BINDING, only: C_PTR, C_INT
+    implicit none
+    type(C_PTR), value :: L
+    integer(kind=C_INT) :: tblidx, ref
+  end subroutine luaL_unref
 
   !===================================================================
   ! Get functions (Lua -> stack)
@@ -592,6 +617,61 @@ end interface
 
 
 CONTAINS
+
+!=====================================================================
+
+  subroutine initDefaultErrfunc(L, errorlogger)
+    use ISO_C_BINDING, only: C_PTR
+    type(C_PTR), value :: L
+    character*(*), optional :: errorlogger
+    integer :: error
+
+    !   Put the error logging function on the stack
+    if (PRESENT(errorlogger)) then
+      call luaL_dostring(L, errorlogger, error)
+    else
+      call luaL_dostring(L, &
+      'os.remove("lua_error.log")' // nwln // &
+      'function logError(...)' // nwln // &
+      '  local f = assert(io.open("lua_error.log","a+"))' // nwln // &
+      '  if f == nil then f = io.stdout end' // nwln // &
+      '  for i, error in ipairs{...} do' // nwln // &
+      '    f:write(error)' // nwln // &
+      '  end' // nwln // &
+      '  f:close()' // nwln // &
+      'end' // nwln // &
+      'return logError', error)
+    end if
+
+    if (error == 0) then
+      if (default_errfunc == 0) then
+        call luaL_unref(L, LUA_REGISTRYINDEX, default_errfunc)
+      end if
+      default_errfunc = luaL_ref(L, LUA_REGISTRYINDEX)
+    end if
+  end subroutine initDefaultErrfunc
+
+!=====================================================================
+
+  function lua_pcall(L, nargs, nresults, errfunc)
+    use ISO_C_BINDING, only: C_PTR, C_INT
+    implicit none
+    type(C_PTR), value :: L
+    integer(kind=C_INT), value :: nargs, nresults
+    integer(kind=C_INT), optional :: errfunc
+    integer(kind=C_INT) :: lua_pcall
+    integer(kind=C_INT) :: errfunc_
+
+!   If errfunc is passed in, use that value. Otherwise, use the
+!   default errfunc.
+    if (PRESENT(errfunc)) then
+      errfunc_ = errfunc
+    else
+      errfunc_ = default_errfunc
+    end if
+
+    lua_pcall = lua_pcall_c(L, nargs, nresults, errfunc_)
+  end function lua_pcall
 
 !=====================================================================
 
