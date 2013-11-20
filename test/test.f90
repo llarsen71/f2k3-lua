@@ -12,9 +12,8 @@ PROGRAM test
   CHARACTER*2 :: nl = CHAR(13) // CHAR(10)
   !
   L = luaL_newstate()
-  call initDefaultErrfunc(L)
-
   CALL flua_opensandboxlibs(L);
+  call initDefaultErrfunc(L)
 
   CALL luaL_dostring(L, 'asdfa ~ adf', error)
 

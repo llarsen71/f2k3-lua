@@ -26,7 +26,6 @@ module flua
     character(kind=C_CHAR, len=1), dimension(:), pointer :: str
   end type cStrPTR
 
-  integer(kind=C_INT) :: default_errfunc = 0
   character*2 :: nwln = CHAR(13) // CHAR(10)
 
 interface
@@ -439,7 +438,7 @@ interface
     use ISO_C_BINDING, only: C_PTR, C_INT
     implicit none
     type(C_PTR), value :: L
-    integer(kind=C_INT) :: tblidx
+    integer(kind=C_INT), value :: tblidx
     integer(kind=C_INT) :: luaL_ref
   end function luaL_ref
   !
@@ -449,7 +448,7 @@ interface
     use ISO_C_BINDING, only: C_PTR, C_INT
     implicit none
     type(C_PTR), value :: L
-    integer(kind=C_INT) :: tblidx, ref
+    integer(kind=C_INT), value :: tblidx, ref
   end subroutine luaL_unref
 
   !===================================================================
@@ -632,22 +631,14 @@ CONTAINS
     else
       call luaL_dostring(L, &
       'os.remove("lua_error.log")' // nwln // &
-      'function logError(...)' // nwln // &
+      'function logLuaError(...)' // nwln // &
       '  local f = assert(io.open("lua_error.log","a+"))' // nwln // &
-      '  if f == nil then f = io.stdout end' // nwln // &
+      '  if f == nil then return end' // nwln // &
       '  for i, error in ipairs{...} do' // nwln // &
       '    f:write(error)' // nwln // &
       '  end' // nwln // &
       '  f:close()' // nwln // &
-      'end' // nwln // &
-      'return logError', error)
-    end if
-
-    if (error == 0) then
-      if (default_errfunc == 0) then
-        call luaL_unref(L, LUA_REGISTRYINDEX, default_errfunc)
-      end if
-      default_errfunc = luaL_ref(L, LUA_REGISTRYINDEX)
+      'end', error)
     end if
   end subroutine initDefaultErrfunc
 
@@ -660,18 +651,36 @@ CONTAINS
     integer(kind=C_INT), value :: nargs, nresults
     integer(kind=C_INT), optional :: errfunc
     integer(kind=C_INT) :: lua_pcall
-    integer(kind=C_INT) :: errfunc_
 
 !   If errfunc is passed in, use that value. Otherwise, use the
 !   default errfunc.
     if (PRESENT(errfunc)) then
-      errfunc_ = errfunc
+      lua_pcall = lua_pcall_c(L, nargs, nresults, errfunc)
     else
-      errfunc_ = default_errfunc
-    end if
+      lua_pcall = lua_pcall_c(L, nargs, nresults, 0)
 
-    lua_pcall = lua_pcall_c(L, nargs, nresults, errfunc_)
+      if (lua_pcall /= 0) then
+        call handleError(L)
+      end if
+    end if
   end function lua_pcall
+
+!=====================================================================
+
+  subroutine handleError(L)
+    use ISO_C_BINDING, only: C_PTR, C_INT
+    implicit none
+    type(C_PTR), value :: L
+    integer(kind=C_INT) :: err
+
+    call lua_getglobal(L, "logLuaError")
+    if (lua_isnil(L, -1)) then
+      call lua_pop(L,1)
+    else
+      call lua_insert(L, -2)
+      err = lua_pcall_c(L, 1, 0, 0)
+    end if
+  end subroutine handleError
 
 !=====================================================================
 
@@ -1198,7 +1207,6 @@ subroutine luaL_dofile(L, fileName, error)
   type(C_PTR), intent(IN) :: L
   character(len=*), intent(IN) :: fileName
   integer, intent(out) :: error
-  character*1000 :: msg
   character(len=1, kind=C_CHAR), dimension(LEN_TRIM(fileName)+1) :: cFileName
 
   call p_characterToCharArray(fileName, cFileName, error)
@@ -1208,23 +1216,21 @@ subroutine luaL_dofile(L, fileName, error)
   error = luaL_loadfile(L, cFileName)
   if (error == 0) then
     error = lua_pcall(L, 0, LUA_MULTRET, 0)
-    if (error /= 0) then
-      ! TODO: report error string
-      call flua_tostring(L, -1, msg)
-    endif
+  else
+    call handleError(L)
   endif
 end subroutine luaL_dofile
 
 !=====================================================================
 
 !> #define luaL_dostring(L, s) (luaL_loadstring(L, s) || lua_pcall(L, 0, LUA_MULTRET, 0))
-subroutine luaL_dostring(L, script, error)
+subroutine luaL_dostring(L, script, error, errfnidx)
   use ISO_C_BINDING, only: C_PTR, C_CHAR, C_NULL_CHAR
   implicit none
   type(C_PTR), intent(IN) :: L
   character(len=*), intent(IN) :: script
   integer, intent(out) :: error
-  character*1000 :: msg
+  integer, optional, intent(in) :: errfnidx
   !
   character(len=1, kind=C_CHAR), dimension(LEN_TRIM(script)+1) :: cscript
 
@@ -1234,11 +1240,13 @@ subroutine luaL_dostring(L, script, error)
   ! TODO: report error string
   error = luaL_loadstring(L, cscript)
   if (error == 0) then
-    error = lua_pcall(L, 0, LUA_MULTRET, 0)
-    if (error /= 0) then
-      ! TODO: report error string
-      call flua_tostring(L, -1, msg)
+    if (PRESENT(errfnidx)) then
+      error = lua_pcall(L, 0, LUA_MULTRET, errfnidx)
+    else
+      error = lua_pcall(L, 0, LUA_MULTRET)
     endif
+  else
+    call handleError(L)
   endif
 end subroutine luaL_dostring
 
