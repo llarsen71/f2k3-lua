@@ -17,6 +17,7 @@ contains
     call run_case(test_loadstring_pcall, "test_loadstring_pcall")
     call run_case(test_lua_gettop,       "test_lua_gettop")
     call run_case(test_lua_settop,       "test_lua_settop")
+    call run_case(test_lua_pushvalue,    "test_lua_pushvalue")
   end subroutine flua_test_package
 
 !=====================================================================
@@ -108,7 +109,6 @@ contains
     close(15, status="delete")
   end subroutine
 
-
 !=====================================================================
 
   subroutine test_loadstring_pcall
@@ -191,6 +191,36 @@ contains
     call lua_settop(L,-3) ! Backup the top by two values
     top = lua_gettop(L)
     call assert_equals(8, top, "Two values should have been popped from the stack")
+  end subroutine
+
+!=====================================================================
+
+  subroutine test_lua_pushvalue
+    implicit none
+    integer i
+
+    do i = 1, 3
+      call lua_pushinteger(L, i)
+    end do
+    call lua_pushnil(L)
+
+    call lua_pushvalue(L, 2)
+    if (.not.lua_isnumber(L, -1)) then
+      call add_fail("lua_pushvalue failed - top of stack should be integer")
+      return
+    endif
+
+    i = lua_tointeger(L, -1)
+    call assert_equals(2, i, "lua_pushvalue - value should be 2")
+    if (i /= 2) then
+      return
+    end if
+
+    call lua_pushvalue(L, -2)
+    if (.not.lua_isnil(L, -1)) then
+      call add_fail("lua_pushvalue failed - top of stack should be nil")
+      return
+    endif
   end subroutine
 
 !=====================================================================
