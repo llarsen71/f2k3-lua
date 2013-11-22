@@ -794,7 +794,7 @@ subroutine C_F_CSTR(cptr, ret, length, as_cSTR)
   ! This is a builtin fortran function that converts c pointers to
   ! fortran pointers.
   call C_F_POINTER(FPTR=ret, CPTR=cptr, SHAPE=(/ length /))
-end subroutine
+end subroutine C_F_CSTR
 
 !=====================================================================
 

@@ -13,11 +13,12 @@ contains
   subroutine flua_test_package()
     implicit none
 
-    call run_case(test_loadfile_pcall,   "test_loadfile_pcall")
-    call run_case(test_loadstring_pcall, "test_loadstring_pcall")
-    call run_case(test_lua_gettop,       "test_lua_gettop")
-    call run_case(test_lua_settop,       "test_lua_settop")
-    call run_case(test_lua_pushvalue,    "test_lua_pushvalue")
+    call run_case(test_loadfile_pcall,     "test_loadfile_pcall")
+    call run_case(test_loadstring_pcall,   "test_loadstring_pcall")
+    call run_case(test_lua_gettop,         "test_lua_gettop")
+    call run_case(test_lua_settop,         "test_lua_settop")
+    call run_case(test_lua_pushvalue,      "test_lua_pushvalue")
+    call run_case(test_initDefaultErrfunc, "test_initDefaultErrfunc")
   end subroutine flua_test_package
 
 !=====================================================================
@@ -221,6 +222,45 @@ contains
       call add_fail("lua_pushvalue failed - top of stack should be nil")
       return
     endif
+  end subroutine
+
+!=====================================================================
+
+  subroutine test_initDefaultErrfunc
+    implicit none
+    integer :: error
+    logical :: exists
+
+!   The initDefaultErrorFunc creates a logLuaError function that gets
+!   called by default when lua_pcall results in an error. This function
+!   first deletes lua_error.log if it exits. If errors occur, it logs the
+!   errors to this file.
+    call initDefaultErrfunc(L)
+    call lua_getglobal(L, "logLuaError")
+    call assert_true(lua_isfunction(L,-1),"The logLuaError function was not registered")
+    inquire(file="lua_error.log", exist=exists)
+    call assert_false(exists, "The lua_error.log file should have been deleted")
+
+!   Try to run a lua script with an error. Verify that the error file is created.
+    call luaL_dostring(L, "a ~ 10", error)
+    inquire(file="lua_error.log", exist=exists)
+    call assert_true(exists, "The lua_error.log file should have been created")
+    call luaL_dostring(L, "os.remove('lua_error.log')", error)
+    inquire(file="lua_error.log", exist=exists)
+    call assert_false(exists, "The lua_error.log file should have been deleted")
+
+!   Set a different logLuaError function that creates a global value called 'worked'
+!   Make sure this value is created when an error is raised.
+    call initDefaultErrfunc(L, "function logLuaError(msg) worked='worked' end")
+    call luaL_dostring(L, "a ~ 10", error)  ! Raise an error
+    call lua_getglobal(L, "worked")         !
+    if (lua_isstring(L,-1)) then
+      call assert_equals("worked", cSTR2fSTR(lua_tostring(L, -1)), "Unexpected value from logLuaError")
+    else
+      call add_fail("The value returned by logLuaError should be a number")
+    end if
+    inquire(file="lua_error.log", exist=exists)
+    call assert_false(exists, "The lua_error.log file should not be created")
   end subroutine
 
 !=====================================================================
