@@ -19,6 +19,7 @@ contains
     call run_case(test_lua_settop,         "test_lua_settop")
     call run_case(test_lua_pushvalue,      "test_lua_pushvalue")
     call run_case(test_initDefaultErrfunc, "test_initDefaultErrfunc")
+    call run_case(test_lua_pcall,          "test_lua_pcall")
   end subroutine flua_test_package
 
 !=====================================================================
@@ -261,6 +262,37 @@ contains
     end if
     inquire(file="lua_error.log", exist=exists)
     call assert_false(exists, "The lua_error.log file should not be created")
+  end subroutine
+
+!=====================================================================
+
+  subroutine test_lua_pcall
+    implicit none
+    integer error
+    type(cStrPTR) :: str
+
+    str = cSTR("return 'Got this'")
+    error = luaL_loadstring(L, str%str)
+    deallocate(str%str)
+    error = lua_pcall(L, 0, 1)
+    if (lua_isstring(L, -1)) then
+      call assert_equals('Got this', cSTR2fSTR(lua_tostring(L, -1)))
+    else
+      call add_fail("A string should have been put on the stack by pcall")
+    end if
+
+!   Try setting an error function
+    str = cSTR("function err(msg) test=1 end"//nwln//"return err")
+    error = luaL_loadstring(L, str%str)
+    deallocate(str%str)
+
+    str = cSTR("a = nil > nil")
+    error = luaL_loadstring(L, str%str)
+    deallocate(str%str)
+
+    error = lua_pcall(L, 0, 1, -2)
+    call lua_getglobal(L, "test")
+    call assert_true(lua_isnumber(L,-1), "The error function didn't appear to be called.")
   end subroutine
 
 !=====================================================================
