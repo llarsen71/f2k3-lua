@@ -26,9 +26,8 @@ CONTAINS
     logical :: success
     integer :: i, n, nretvals, error
 
-!   TODO: parse this for dot notation.
-    call lua_getglobal(L, fncname)
-    if (lua_isnil(L, -1)) then
+    call luaL_dostring(L, "return "//fncname, error)
+    if (error /= 0) then
       success = .false.
       return
     end if
@@ -49,10 +48,12 @@ CONTAINS
     end if
 
     error = lua_pcall(L, n, nretvals, 0)
-    if (error /= 0) then
-      !TODO: print error
+    if (error == 0) then
+      success = .true.
+    else
+      !TODO: handle error
+      success = .false.
     end if
-
   end function luaCall
 
 !=====================================================================

@@ -274,7 +274,7 @@ contains
     str = cSTR("return 'Got this'")
     error = luaL_loadstring(L, str%str)
     deallocate(str%str)
-    error = lua_pcall(L, 0, 1)
+    error = lua_pcall(L, 0, -1)
     if (lua_isstring(L, -1)) then
       call assert_equals('Got this', cSTR2fSTR(lua_tostring(L, -1)))
     else
@@ -285,6 +285,11 @@ contains
     str = cSTR("function err(msg) test=1 end"//nwln//"return err")
     error = luaL_loadstring(L, str%str)
     deallocate(str%str)
+    error = lua_pcall(L, 0, -1)
+    if (.not.lua_isfunction(L, -1)) then
+      call add_fail("A function should be on the stack after the pcall")
+      return
+    end if
 
     str = cSTR("a = nil > nil")
     error = luaL_loadstring(L, str%str)
@@ -293,6 +298,7 @@ contains
     error = lua_pcall(L, 0, 1, -2)
     call lua_getglobal(L, "test")
     call assert_true(lua_isnumber(L,-1), "The error function didn't appear to be called.")
+    call assert_equals(1, lua_tointeger(L,-1), "The error function should set test=1")
   end subroutine
 
 !=====================================================================

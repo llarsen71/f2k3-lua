@@ -667,6 +667,23 @@ CONTAINS
 
 !=====================================================================
 
+  function flua_pcall(L, nargs, nresults, errfunc) result(success)
+    use ISO_C_BINDING, only: C_PTR, C_INT
+    implicit none
+    type(C_PTR), value :: L
+    integer(kind=C_INT), value :: nargs, nresults
+    integer(kind=C_INT), optional :: errfunc
+    logical :: success
+
+    if (lua_pcall(L, nargs, nresults, errfunc) == 0) then
+      success = .true.
+    else
+      success = .false.
+    end if
+  end function flua_pcall
+
+!=====================================================================
+
   subroutine handleError(L)
     use ISO_C_BINDING, only: C_PTR, C_INT
     implicit none
@@ -1200,6 +1217,22 @@ end subroutine lua_setfield
 
 !=====================================================================
 
+function fluaL_loadfile(L, filename) result(success)
+  use ISO_C_BINDING, only: C_PTR, C_CHAR, C_INT
+  implicit none
+  type(C_PTR), value :: L
+  character(kind=C_CHAR, len=1), dimension(*) :: filename
+  logical :: success
+
+  if (luaL_loadfile(L, filename) == 0) then
+    success = .true.
+  else
+    success = .false.
+  end if
+end function fluaL_loadfile
+
+!=====================================================================
+
 !> #define luaL_dofile(L, fn) (luaL_loadfile(L, fn) || lua_pcall(L, 0, LUA_MULTRET, 0))
 subroutine luaL_dofile(L, fileName, error)
   use ISO_C_BINDING, only: C_PTR, C_CHAR, C_NULL_CHAR
@@ -1220,6 +1253,25 @@ subroutine luaL_dofile(L, fileName, error)
     call handleError(L)
   endif
 end subroutine luaL_dofile
+
+!=====================================================================
+
+  function fluaL_loadstring(L, script) result(success)
+    use ISO_C_BINDING, only: C_PTR, C_CHAR, C_INT
+    implicit none
+    type(C_PTR), value :: L
+    character*(*) :: script
+    logical :: success
+    type(cStrPTR) :: cscript
+
+    cscript = cSTR(script,.FALSE.)
+    if (luaL_loadstring(L, cscript%str) == 0) then
+      success = .true.
+    else
+      success = .false.
+    end if
+    deallocate(cscript%str)
+  end function fluaL_loadstring
 
 !=====================================================================
 
