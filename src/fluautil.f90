@@ -4,9 +4,12 @@ MODULE fluautil
   implicit none
 
   type PARAM
-    type(C_PTR) :: val
+    type(C_PTR) :: val = C_NULL_PTR
     character*2 :: type
+    ! subroutine push2Stack(PARAM, LuaState)
     procedure(), nopass, pointer :: push2Stack => NULL()
+    procedure(), nopass, pointer :: pullFromStack => NULL()
+    procedure(), nopass, pointer :: getVal => NULL()
   end type PARAM
 
   interface PRM
@@ -16,6 +19,8 @@ MODULE fluautil
 CONTAINS
 
 !=====================================================================
+! luaCall - for convenience in calling Lua functions
+!=====================================================================
 
   function luaCall(L, fncname, params, returntypes) result(success)
     implicit none
@@ -23,7 +28,7 @@ CONTAINS
     character*(*) :: fncname
     type(PARAM), optional :: params(:)
     type(PARAM), optional :: returntypes(:)
-    logical :: success
+    logical :: success, success_
     integer :: i, n, nretvals, error
 
     call luaL_dostring(L, "return "//fncname, error)
@@ -50,12 +55,21 @@ CONTAINS
     error = lua_pcall(L, n, nretvals, 0)
     if (error == 0) then
       success = .true.
+      if (PRESENT(returntypes)) then
+        n = nretvals
+        do i = 1, n
+          call returntypes(i)%pullFromStack(returntypes(i), L, i-n-1, success_)
+          success = success .and. success_
+        end do
+      end if
     else
-      !TODO: handle error
+      call handleError(L)
       success = .false.
     end if
   end function luaCall
 
+!=====================================================================
+! Parameters
 !=====================================================================
 
   function PRMint(intval, copy)
@@ -97,11 +111,11 @@ CONTAINS
 
 !=====================================================================
 
-  function PRMreal(realval, copy)
+  function PRMreal(realval, copy) result(prm_)
     implicit none
     real, target :: realval
     logical, optional :: copy
-    type(PARAM), pointer :: PRMreal
+    type(PARAM), pointer :: prm_
     logical copy_
     real, pointer :: realval_
 
@@ -116,10 +130,10 @@ CONTAINS
       realval_ => realval
     endif
 
-    allocate(PRMreal)
-    PRMreal%type = "r"
-    PRMreal%push2Stack => pushReal
-    PRMreal%val = C_LOC(realval_)
+    allocate(prm_)
+    prm_%type = "r"
+    prm_%push2Stack => pushReal
+    prm_%val = C_LOC(realval_)
   end function PRMreal
 
 !=====================================================================
@@ -142,8 +156,9 @@ CONTAINS
     implicit none
     character*(*) :: strval
     type(PARAM), pointer :: PRMstr
-    type(cStrPTR), target :: strval_
+    type(cStrPTR), pointer :: strval_
 
+    allocate(strval_)
     strval_ = cSTR(strval, .FALSE.)
 
     allocate(PRMstr)
@@ -161,7 +176,8 @@ CONTAINS
     type(cStrPTR), pointer :: strval
 
     call C_F_POINTER(prm%val, strval)
-    call lua_pushstring(L, cstr2fstr(strval))
+    call lua_pushstring(L, cSTR2fSTR(strval))
+    deallocate(strval)
   end subroutine pushStr
 
 !=====================================================================
@@ -196,13 +212,13 @@ CONTAINS
 
 !=====================================================================
 
-  function NIL()
+  function PRMnil() result(NIL)
     implicit none
     type(PARAM), pointer :: NIL
     allocate(NIL)
     NIL%type = "nl"
     NIL%push2Stack => pushnil
-  end function NIL
+  end function PRMnil
 
 !=====================================================================
 
@@ -210,8 +226,95 @@ CONTAINS
     implicit none
     type(PARAM) :: prm
     type(C_PTR) :: L
+
     call lua_pushnil(L)
   end subroutine pushnil
+
+!=====================================================================
+! Return Values
+!=====================================================================
+
+  function RVint() result(rv)
+    implicit none
+    type(PARAM) :: rv
+
+    rv%type = "i"
+    rv%pullFromStack => pullFromStackInt
+  end function RVint
+
+!=====================================================================
+
+  subroutine pullFromStackInt(prm, L, idx, success)
+    implicit none
+    type(PARAM) :: prm
+    type(C_PTR) :: L
+    integer :: idx
+    logical :: success
+    integer, pointer :: val
+
+    if (.not.lua_isnumber(L, idx)) then
+      success = .false.
+      return
+    end if
+
+    allocate(val)
+    val = lua_tointeger(L, idx)
+    prm%val = C_LOC(val)
+  end subroutine pullFromStackInt
+
+!=====================================================================
+
+  subroutine getValInt(prm, int, free_)
+    implicit none
+    type(PARAM) :: prm
+    integer :: int
+    integer, pointer :: temp
+    logical, optional :: free_
+    logical :: free1
+
+    if (.not.c_associated(prm%val)) then
+      return
+    end if
+
+    call c_f_pointer(prm%val, temp)
+    int = temp
+
+    free1 = .true.
+    if (present(free_)) then
+      free1 = free_
+    end if
+    if (free1) then
+      deallocate(temp)
+      prm%val = c_null_ptr
+    end if
+  end subroutine getValInt
+
+!=====================================================================
+
+  function RVreal() result(rv)
+    implicit none
+    type(PARAM) :: rv
+
+    rv%type = "r"
+  end function RVreal
+
+!=====================================================================
+
+  function RVstr() result(rv)
+    implicit none
+    type(PARAM) :: rv
+
+    rv%type = "s"
+  end function RVstr
+
+!=====================================================================
+
+  function RVnil() result(rv)
+    implicit none
+    type(PARAM) :: rv
+
+    rv%type = "nl"
+  end function RVnil
 
 !=====================================================================
 

@@ -1256,22 +1256,22 @@ end subroutine luaL_dofile
 
 !=====================================================================
 
-  function fluaL_loadstring(L, script) result(success)
-    use ISO_C_BINDING, only: C_PTR, C_CHAR, C_INT
-    implicit none
-    type(C_PTR), value :: L
-    character*(*) :: script
-    logical :: success
-    type(cStrPTR) :: cscript
+function fluaL_loadstring(L, script) result(success)
+  use ISO_C_BINDING, only: C_PTR, C_CHAR, C_INT
+  implicit none
+  type(C_PTR), value :: L
+  character*(*) :: script
+  logical :: success
+  type(cStrPTR) :: cscript
 
-    cscript = cSTR(script,.FALSE.)
-    if (luaL_loadstring(L, cscript%str) == 0) then
-      success = .true.
-    else
-      success = .false.
-    end if
-    deallocate(cscript%str)
-  end function fluaL_loadstring
+  cscript = cSTR(script,.FALSE.)
+  if (luaL_loadstring(L, cscript%str) == 0) then
+    success = .true.
+  else
+    success = .false.
+  end if
+  deallocate(cscript%str)
+end function fluaL_loadstring
 
 !=====================================================================
 
@@ -1281,26 +1281,45 @@ subroutine luaL_dostring(L, script, error, errfnidx)
   implicit none
   type(C_PTR), intent(IN) :: L
   character(len=*), intent(IN) :: script
-  integer, intent(out) :: error
+  integer, optional, intent(out) :: error
   integer, optional, intent(in) :: errfnidx
+  integer error_
   !
   character(len=1, kind=C_CHAR), dimension(LEN_TRIM(script)+1) :: cscript
 
-  call p_characterToCharArray(script, cscript, error)
-  ! error cannot be /= 0
+  call p_characterToCharArray(script, cscript, error_)
+  ! error should be 0
   !
   ! TODO: report error string
-  error = luaL_loadstring(L, cscript)
-  if (error == 0) then
+  error_ = luaL_loadstring(L, cscript)
+  if (error_ == 0) then
     if (PRESENT(errfnidx)) then
-      error = lua_pcall(L, 0, LUA_MULTRET, errfnidx)
+      error_ = lua_pcall(L, 0, LUA_MULTRET, errfnidx)
     else
-      error = lua_pcall(L, 0, LUA_MULTRET)
+      error_ = lua_pcall(L, 0, LUA_MULTRET)
     endif
   else
     call handleError(L)
   endif
+  if (PRESENT(error)) then
+    error = error_
+  end if
 end subroutine luaL_dostring
+
+!=====================================================================
+
+function fluaL_dostring(L, script, errfnidx) result(success)
+  use ISO_C_BINDING, only: C_PTR, C_CHAR, C_NULL_CHAR
+  implicit none
+  type(C_PTR), intent(IN) :: L
+  character(len=*), intent(IN) :: script
+  integer, optional, intent(in) :: errfnidx
+  logical :: success
+  integer :: error
+
+  call luaL_dostring(L, script, error, errfnidx)
+  success = (error == 0)
+end function fluaL_dostring
 
 !=====================================================================
 
@@ -1311,6 +1330,7 @@ subroutine stackDump(L)
   integer :: i, top, t
 
   top = lua_gettop(L)
+  write(6, "(A)") ""
   write(6, "(A)") "***start stack***"
   do i = 1,top
     t = lua_type(L, i)
