@@ -735,18 +735,18 @@ end function cSTR
 
 !=====================================================================
 
-function cSTR2fSTR(cstr_, dealloc)
+function cSTR2fSTR(cstr_, dealloc) result(fstr)
   implicit none
   type(cStrPTR) :: cstr_
   logical, optional :: dealloc
-  character(len=SIZE(cstr_%str)-1) :: cSTR2fSTR
+  character(len=SIZE(cstr_%str)-1) :: fstr
   logical :: dealloc_
   integer :: i, sz
 
 ! Fill in the fortran string
   sz = SIZE(cstr_%str)-1
   do i = 1, sz
-    cSTR2fSTR(i:i) = cstr_%str(i)
+    fstr(i:i) = cstr_%str(i)
   end do
 
 ! deallocate the string if specified.
