@@ -123,7 +123,7 @@ contains
       return
     end if
 
-    if (.not.luaCall(L, "callme", (/ PRMnil(), PRM(1), PRM(2.4), PRM('test') /))) then
+    if (.not.luaCall(L, "callme", (/ PRMnil(), PRM(1), PRM(2.4), PRM('test') /), 1)) then
       call add_fail("An error occurred executing the 'callme' function")
     else
 !     A nil value should be on stack if callme was successful

@@ -8,12 +8,10 @@ MODULE fluautil
     character*2 :: type
     ! subroutine push2Stack(PARAM, LuaState)
     procedure(), nopass, pointer :: push2Stack => NULL()
-    procedure(), nopass, pointer :: pullFromStack => NULL()
-    procedure(), nopass, pointer :: getVal => NULL()
   end type PARAM
 
   interface PRM
-    module procedure PRMint, PRMreal, PRMstr
+    module procedure PRMint, PRMreal, PRMstr, PRMnil
   end interface
 
 CONTAINS
@@ -22,14 +20,14 @@ CONTAINS
 ! luaCall - for convenience in calling Lua functions
 !=====================================================================
 
-  function luaCall(L, fncname, params, returntypes) result(success)
+  function luaCall(L, fncname, params, nretvals) result(success)
     implicit none
-    type(C_PTR), value :: L
-    character*(*) :: fncname
+    type(C_PTR), value    :: L
+    character*(*)         :: fncname
     type(PARAM), optional :: params(:)
-    type(PARAM), optional :: returntypes(:)
-    logical :: success, success_
-    integer :: i, n, nretvals, error
+    integer, optional     :: nretvals
+    logical :: success
+    integer :: i, n, error, nretvals_
 
     call luaL_dostring(L, "return "//fncname, error)
     if (error /= 0) then
@@ -46,22 +44,15 @@ CONTAINS
       n = 0
     end if
 
-    if (PRESENT(returntypes)) then
-      nretvals = size(returntypes)
+    if (PRESENT(nretvals)) then
+      nretvals_ = nretvals
     else
-      nretvals = LUA_MULTRET
+      nretvals_ = LUA_MULTRET
     end if
 
-    error = lua_pcall(L, n, nretvals, 0)
+    error = lua_pcall(L, n, nretvals_, 0)
     if (error == 0) then
       success = .true.
-      if (PRESENT(returntypes)) then
-        n = nretvals
-        do i = 1, n
-          call returntypes(i)%pullFromStack(returntypes(i), L, i-n-1, success_)
-          success = success .and. success_
-        end do
-      end if
     else
       call handleError(L)
       success = .false.
@@ -229,92 +220,6 @@ CONTAINS
 
     call lua_pushnil(L)
   end subroutine pushnil
-
-!=====================================================================
-! Return Values
-!=====================================================================
-
-  function RVint() result(rv)
-    implicit none
-    type(PARAM) :: rv
-
-    rv%type = "i"
-    rv%pullFromStack => pullFromStackInt
-  end function RVint
-
-!=====================================================================
-
-  subroutine pullFromStackInt(prm, L, idx, success)
-    implicit none
-    type(PARAM) :: prm
-    type(C_PTR) :: L
-    integer :: idx
-    logical :: success
-    integer, pointer :: val
-
-    if (.not.lua_isnumber(L, idx)) then
-      success = .false.
-      return
-    end if
-
-    allocate(val)
-    val = lua_tointeger(L, idx)
-    prm%val = C_LOC(val)
-  end subroutine pullFromStackInt
-
-!=====================================================================
-
-  subroutine getValInt(prm, int, free_)
-    implicit none
-    type(PARAM) :: prm
-    integer :: int
-    integer, pointer :: temp
-    logical, optional :: free_
-    logical :: free1
-
-    if (.not.c_associated(prm%val)) then
-      return
-    end if
-
-    call c_f_pointer(prm%val, temp)
-    int = temp
-
-    free1 = .true.
-    if (present(free_)) then
-      free1 = free_
-    end if
-    if (free1) then
-      deallocate(temp)
-      prm%val = c_null_ptr
-    end if
-  end subroutine getValInt
-
-!=====================================================================
-
-  function RVreal() result(rv)
-    implicit none
-    type(PARAM) :: rv
-
-    rv%type = "r"
-  end function RVreal
-
-!=====================================================================
-
-  function RVstr() result(rv)
-    implicit none
-    type(PARAM) :: rv
-
-    rv%type = "s"
-  end function RVstr
-
-!=====================================================================
-
-  function RVnil() result(rv)
-    implicit none
-    type(PARAM) :: rv
-
-    rv%type = "nl"
-  end function RVnil
 
 !=====================================================================
 
