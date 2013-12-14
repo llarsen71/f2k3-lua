@@ -70,8 +70,13 @@ contains
     integer i
     double precision d
 
+#ifdef hasclass
+#define _PRM_
+#else
+#define _PRM_ prm_,
+#endif
     prm_ => PRM(1)
-    call prm_%push2Stack(L)
+    call prm_%push2Stack(_PRM_ L)
     if (lua_isnumber(L, -1)) then
       i = lua_tointeger(L, -1)
       call assert_equals(1, i,"pushInt failed")
@@ -80,7 +85,7 @@ contains
     end if
 
     prm_ => PRM(2, .FALSE.)
-    call prm_%push2Stack(L)
+    call prm_%push2Stack(_PRM_ L)
     if (lua_isnumber(L, -1)) then
       i = lua_tointeger(L, -1)
       call assert_equals(2, i,"pushInt failed")
@@ -89,7 +94,7 @@ contains
     end if
 
     prm_ => PRM(5.4)
-    call prm_%push2Stack(L)
+    call prm_%push2Stack(_PRM_ L)
     if (lua_isnumber(L, -1)) then
       d = lua_tonumber(L, -1)
       call assert_equals(5.4, real(d),"pushInt failed")

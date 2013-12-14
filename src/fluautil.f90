@@ -3,17 +3,25 @@ MODULE fluautil
   use flua
   implicit none
 
+#ifdef hasclass
+#define _TYPE_ class
+#define ISPASS PASS(this),
+#else
+#define _TYPE_ type
+#define ISPASS NOPASS,
+#endif
+
   type PARAM
     type(C_PTR) :: val = C_NULL_PTR
     character*2 :: type
-    procedure(push2stack_), pointer :: push2stack => NULL()
+    procedure(push2stack_), ISPASS pointer :: push2stack => NULL()
   end type PARAM
 
   abstract interface
     subroutine push2stack_(this, L)
       use iso_c_binding, only: c_ptr
       import :: PARAM
-      class(PARAM) :: this
+      _TYPE_(PARAM) :: this
       type(c_ptr) :: L
     end subroutine
   end interface
@@ -43,10 +51,15 @@ CONTAINS
       return
     end if
 
+#ifdef hasclass
+#define _PRM_
+#else
+#define _PRM_ params(i),
+#endif
     if (PRESENT(params)) then
       n = size(params)
       do i = 1, n
-        call params(i)%push2Stack(L)
+        call params(i)%push2Stack(_PRM_ L)
       end do
     else
       n = 0
@@ -100,7 +113,7 @@ CONTAINS
 
   subroutine pushInt(prm, L)
     implicit none
-    class(PARAM) :: prm
+    _TYPE_(PARAM) :: prm
     type(C_PTR) :: L
     integer, pointer :: i
 
@@ -139,7 +152,7 @@ CONTAINS
 
   subroutine pushReal(prm, L)
     implicit none
-    class(PARAM) :: prm
+    _TYPE_(PARAM) :: prm
     type(C_PTR) :: L
     real, pointer :: r
     double precision :: d
@@ -170,7 +183,7 @@ CONTAINS
 
   subroutine pushStr(prm, L)
     implicit none
-    class(PARAM) :: prm
+    _TYPE_(PARAM) :: prm
     type(C_PTR) :: L
     type(cStrPTR), pointer :: strval
 
@@ -196,7 +209,7 @@ CONTAINS
 
   subroutine pushcfn(prm, L)
     implicit none
-    class(PARAM) :: prm
+    _TYPE_(PARAM) :: prm
     type(C_PTR) :: L
     type(C_FUNPTR), pointer :: cfn
 
@@ -223,7 +236,7 @@ CONTAINS
 
   subroutine pushnil(prm, L)
     implicit none
-    class(PARAM) :: prm
+    _TYPE_(PARAM) :: prm
     type(C_PTR) :: L
 
     call lua_pushnil(L)
