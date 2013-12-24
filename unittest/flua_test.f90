@@ -20,6 +20,7 @@ contains
     call run_case(test_lua_pushvalue,      "test_lua_pushvalue")
     call run_case(test_initDefaultErrfunc, "test_initDefaultErrfunc")
     call run_case(test_lua_pcall,          "test_lua_pcall")
+    call run_case(test_checkStackTypes,    "test_checkStackTypes")
   end subroutine flua_test_package
 
 !=====================================================================
@@ -299,6 +300,22 @@ contains
     call lua_getglobal(L, "test")
     call assert_true(lua_isnumber(L,-1), "The error function didn't appear to be called.")
     call assert_equals(1, lua_tointeger(L,-1), "The error function should set test=1")
+  end subroutine
+
+!=====================================================================
+
+  subroutine test_checkStackTypes
+    implicit none
+
+    call lua_pushnil(L)
+
+    call lua_pushinteger(L, 10)
+    call lua_pushstring(L, "testing")
+    call lua_pushboolean(L, .false.)
+    call lua_pushnil(L)
+
+    call assert_true(checkStackTypes(L, (/ LUA_TNUMBER, LUA_TSTRING, LUA_TBOOLEAN, LUA_TNIL /)), &
+         "Types on stack did not match")
   end subroutine
 
 !=====================================================================

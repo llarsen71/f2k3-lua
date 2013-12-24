@@ -414,12 +414,12 @@ interface
   !
   !
   !> LUA_API void  (lua_pushboolean) (lua_State *L, int b);
-  subroutine lua_pushboolean(L, b) bind(C, name="lua_pushboolean")
+  subroutine lua_pushboolean_c(L, b) bind(C, name="lua_pushboolean")
     use ISO_C_BINDING, only: C_PTR, C_BOOL
     implicit none
     type(C_PTR), value :: L
     logical(C_BOOL), value :: b
-  end subroutine lua_pushboolean
+  end subroutine lua_pushboolean_c
   !
   !
   !> LUA_API void  (lua_pushlightuserdata) (lua_State *L, void *ptr);
@@ -1080,6 +1080,19 @@ end function lua_tointeger
 
 !=====================================================================
 
+subroutine lua_pushboolean(L, b)
+  use ISO_C_BINDING, only: C_PTR, C_BOOL
+  implicit none
+  type(C_PTR), value :: L
+  logical :: b
+  logical(C_BOOL) :: b2
+
+  b2 = b
+  call lua_pushboolean_c(L, b2)
+end subroutine lua_pushboolean
+
+!=====================================================================
+
 subroutine lua_pushinteger(L, val)
   use ISO_C_BINDING, only: C_PTR
   implicit none
@@ -1459,6 +1472,38 @@ function getTblField(L, fieldname, type_, tableidx)
 
   getTblField = .TRUE.
 end function getTblField
+
+!=====================================================================
+
+function checkStackTypes(L, types) result(ismatch)
+!
+! Check the types at the end of the stack. Useful for checking that
+! return values match expected types.
+!
+  use ISO_C_BINDING, only: C_PTR
+  implicit none
+  type(C_PTR), value, intent(IN) :: L
+  integer :: types(:)
+  logical :: ismatch
+  integer :: i, istack, nstack, ntypes
+
+  nstack = lua_gettop(L)
+  ntypes = size(types)
+  if (nstack < ntypes) then
+    ismatch = .false.
+    return
+  endif
+
+  do i = 1, ntypes
+    istack = nstack-ntypes+i
+    if (lua_type(L, istack) /= types(i)) then
+      ismatch = .false.
+      return
+    end if
+  end do
+
+  ismatch = .true.
+end function checkStackTypes
 
 !=====================================================================
 
