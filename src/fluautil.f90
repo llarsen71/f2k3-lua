@@ -28,12 +28,12 @@ CONTAINS
 ! luaCall - for convenience in calling Lua functions
 !=====================================================================
 
-  function luaCall(L, fncname, params, nretvals) result(success)
+  function luaCall(L, fncname, params, retvals) result(success)
     implicit none
     type(C_PTR), value    :: L
     character*(*)         :: fncname
     type(PARAM), optional :: params(:)
-    integer, optional     :: nretvals
+    integer, optional     :: retvals(:)
     logical :: success
     integer :: i, n, error, nretvals_
 
@@ -52,15 +52,19 @@ CONTAINS
       n = 0
     end if
 
-    if (PRESENT(nretvals)) then
-      nretvals_ = nretvals
+    if (PRESENT(retvals)) then
+      nretvals_ = size(retvals)
     else
       nretvals_ = LUA_MULTRET
     end if
 
     error = lua_pcall(L, n, nretvals_, 0)
     if (error == 0) then
-      success = .true.
+      if (PRESENT(retvals)) then
+        success = checkStackTypes(L, retvals)
+      else
+        success = .true.
+      end if
     else
       call handleError(L)
       success = .false.
