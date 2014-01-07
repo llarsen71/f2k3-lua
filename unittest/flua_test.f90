@@ -5,6 +5,8 @@ module flua_test
   implicit none
 
   type(C_PTR) :: L
+  
+  integer :: dummy
 
 contains
 
@@ -21,6 +23,7 @@ contains
     call run_case(test_initDefaultErrfunc, "test_initDefaultErrfunc")
     call run_case(test_lua_pcall,          "test_lua_pcall")
     call run_case(test_checkStackTypes,    "test_checkStackTypes")
+    call run_case(test_openlib,            "test_openlib")
   end subroutine flua_test_package
 
 !=====================================================================
@@ -317,6 +320,48 @@ contains
     call assert_true(checkStackTypes(L, (/ LUA_TNUMBER, LUA_TSTRING, LUA_TBOOLEAN, LUA_TNIL /)), &
          "Types on stack did not match")
   end subroutine
+
+!=====================================================================
+
+  subroutine test_openlib()
+    implicit none
+    type(fluaL_Reg) :: fncs(2)
+    logical :: success
+
+    fncs = (/ fluaL_Reg("test", c_funloc(lua_test)), &
+              fluaL_Reg("test2", c_funloc(lua_test2)) /)
+    call flua_openlib(L, fncs, "mod")
+    
+    dummy = 1
+    success = fluaL_dostring(L, "mod.test(2)")
+    call assert_equals(2, dummy, "The dummy value should have been set to 2 by lua call.")
+    success = fluaL_dostring(L, "mod.test(4)")
+    call assert_equals(4, dummy, "The dummy value should have been set to 4 by lua call.")    
+    success = fluaL_dostring(L, "mod.test2(4)")
+    call assert_equals(8, dummy, "The dummy value should have been set to 8 by lua call.")
+  end subroutine
+
+  subroutine lua_test(lua)
+    implicit none
+    type(c_ptr), value :: lua
+    logical :: success
+    
+    success = lua_isnumber(lua, -1)
+    call assert_true(success, "A number should have been pass to lua function mod.test")
+    if (.not.success) return
+    dummy = lua_tointeger(lua, -1)
+  end subroutine
+  
+  subroutine lua_test2(lua)
+    implicit none
+    type(c_ptr), value :: lua
+    logical :: success
+    
+    success = lua_isnumber(lua, -1)
+    call assert_true(success, "A number should have been pass to lua function mod.test")
+    if (.not.success) return
+    dummy = lua_tointeger(lua, -1)*2
+  end subroutine  
 
 !=====================================================================
 

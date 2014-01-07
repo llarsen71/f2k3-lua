@@ -9,4 +9,5 @@ program fluaUnitTest
   call flua_util_test_package
   call fruit_summary
   continue
+
 end program fluaUnitTest

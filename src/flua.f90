@@ -2,7 +2,7 @@
 ! Licensed under the MIT license, see LICENSE file.
 
 module flua
-  use ISO_C_BINDING, only: C_CHAR, C_INT
+  use ISO_C_BINDING, only: C_CHAR, C_INT, C_FUNPTR
   private :: p_characterToCharArray
   integer, PARAMETER :: LUA_MULTRET = -1
 
@@ -26,6 +26,11 @@ module flua
     character(kind=C_CHAR, len=1), dimension(:), pointer :: str
   end type cStrPTR
 
+  type fluaL_Reg
+    character*255  :: name
+    type(C_FUNPTR) :: fn
+  end type fluaL_Reg
+
   character*2 :: nwln = CHAR(13) // CHAR(10)
 
 interface
@@ -46,7 +51,7 @@ interface
   end subroutine lua_close
 
   !===================================================================
-  ! Base libraries
+  ! Libraries
   !==================================================================
   !
   !
@@ -56,6 +61,17 @@ interface
     implicit none
     type(C_PTR), value :: L
   end subroutine luaL_openlibs
+  !
+  !
+  !> LUALIB_API const char *luaL_findtable (lua_State *L, int idx, const char *fname, int szhint)
+  function luaL_findtable(L, idx, fname, szhint) result(err) bind(c, name="luaL_findtable")
+    use iso_c_binding, only: C_PTR, C_CHAR, C_INT
+    type(C_PTR), value  :: L
+    integer(kind=C_INT), value :: idx
+    character(kind=C_CHAR, len=1), dimension(*) :: fname
+    integer(kind=C_INT), value :: szhint
+    type(C_PTR) :: err
+  end function luaL_findtable
 
   !===================================================================
   ! Load and execute files
@@ -450,6 +466,14 @@ interface
     type(C_PTR), value :: L
     integer(kind=C_INT), value :: tblidx, ref
   end subroutine luaL_unref
+  !
+  !
+  !> LUA_API int lua_error (lua_State *L);
+  function lua_error(L) bind(C, name="lua_error")
+    use ISO_C_BINDING, only: C_PTR, C_INT
+    type(C_PTR), value :: L
+    integer(kind=C_INT) :: lua_error
+  end function lua_error
 
   !===================================================================
   ! Get functions (Lua -> stack)
@@ -1185,12 +1209,25 @@ end function lua_next
 subroutine lua_pushcfunction(L, fn)
   use ISO_C_BINDING, only: C_PTR, C_FUNPTR
   implicit none
-  type(C_PTR), intent(IN) :: L
-  type(C_FUNPTR), intent(IN) :: fn
+  type(C_PTR), value :: L
+  type(C_FUNPTR) :: fn
   !
   call lua_pushcclosure(L, fn, 0)
 end subroutine lua_pushcfunction
 
+!=====================================================================
+ 
+subroutine flua_error(L, msg)
+  use ISO_C_BINDING, only: C_PTR
+  implicit none
+  type(C_PTR), value :: L
+  character(*) :: msg
+  integer :: rslt
+  
+  call lua_pushstring(L, msg)
+  rslt = lua_error(L)
+end subroutine flua_error
+ 
 !=====================================================================
 
 subroutine lua_getfield(L, n, k)
@@ -1435,6 +1472,60 @@ subroutine flua_opensandboxlibs(L)
 
   call luaL_openlibs(L)
 end subroutine flua_opensandboxlibs
+
+!=====================================================================
+
+function fluaL_findtable(L, idx, fname, szhint) result(success)
+  use iso_c_binding
+  implicit none
+  type(C_PTR), value :: L
+  integer(kind=C_INT) :: idx
+  character(*) :: fname
+  integer(kind=C_INT) :: szhint
+  logical :: success
+  type(C_PTR)    :: err_ = c_null_ptr
+  character(len=1, kind=C_CHAR), dimension(LEN_TRIM(fname)+1) :: fname_
+  integer :: error_
+
+  call p_characterToCharArray(fname, fname_, error_)
+  err_ = luaL_findtable(L, idx, fname_, szhint)
+  success = .not.c_associated(err_)
+end function fluaL_findtable
+
+!=====================================================================
+
+subroutine flua_openlib(L, fncs, libname)
+  use iso_c_binding
+  implicit none
+  type(C_PTR), value :: L
+  type(fluaL_Reg) :: fncs(:)
+  character(*), optional :: libname
+  !integer(type=c_int), optional :: nup
+  integer :: i
+  type(cStrPTR) :: name
+  logical :: success
+
+  if (PRESENT(libname)) then
+    ! check whether lib already exists
+    success = fluaL_findtable(L, LUA_REGISTRYINDEX, "_LOADED", 1)
+    call lua_getfield(L, -1, libname)  ! get _LOADED[libname]
+    if (.not.lua_istable(L, -1)) then  ! not found?
+      call lua_pop(L, 1)               ! remove previous result
+      ! try global variable (and create one if it does not exist)
+      if (.not.fluaL_findtable(L, LUA_GLOBALSINDEX, libname, 1)) then
+         call flua_error(L, "name conflict for module " // TRIM(libname))
+         return
+      endif
+      call lua_pushvalue(L, -1);
+      call lua_setfield(L, -3, libname);  ! _LOADED[libname] = new table
+    endif
+    call lua_remove(L, -2)         ! remove _LOADED table
+  endif
+  do i = 1, size(fncs)
+    call lua_pushcfunction(L, fncs(i)%fn)
+    call lua_setfield(L, -2, fncs(i)%name)
+  end do
+end subroutine flua_openlib
 
 !=====================================================================
 
