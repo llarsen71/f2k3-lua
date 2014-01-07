@@ -927,7 +927,7 @@ end function lua_typename
 subroutine lua_getglobal(L, key)
   use ISO_C_BINDING, only: C_PTR, C_CHAR, C_NULL_CHAR
   implicit none
-  type(C_PTR), intent(IN) :: L
+  type(C_PTR), value :: L
   character(len=*), intent(IN) :: key
 
   call lua_getfield(L, LUA_GLOBALSINDEX, key)
@@ -938,7 +938,7 @@ end subroutine lua_getglobal
 subroutine lua_setglobal(L, key)
   use ISO_C_BINDING, only: C_PTR, C_CHAR, C_NULL_CHAR
   implicit none
-  type(C_PTR), intent(IN) :: L
+  type(C_PTR), value :: L
   character(len=*), intent(IN) :: key
   !
   call lua_setfield(L,  LUA_GLOBALSINDEX, key)
@@ -1185,7 +1185,7 @@ end subroutine lua_pushtable
 subroutine lua_newtable(L, tablename)
   use ISO_C_BINDING, only: C_PTR, C_CHAR
   implicit none
-  type(C_PTR), intent(out) :: L
+  type(C_PTR), value :: L
   character(*), optional :: tablename
   integer :: error
 
