@@ -326,11 +326,11 @@ contains
 
   subroutine test_openlib()
     implicit none
-    type(fluaL_Reg) :: fncs(2)
+    type(FNCPTR) :: fncs(2)
     logical :: success
 
-    fncs = (/ fluaL_Reg("test", c_funloc(lua_test)), &
-              fluaL_Reg("test2", c_funloc(lua_test2)) /)
+    fncs = (/ FNCPTR("test", c_funloc(lua_test)), &
+              FNCPTR("test2", c_funloc(lua_test2)) /)
     call flua_openlib(L, fncs, "mod")
     
     dummy = 1
@@ -368,7 +368,7 @@ contains
 
   subroutine test_usertype()
     implicit none
-    type(fluaL_Reg) :: fncs(3)
+    type(FNCPTR) :: fncs(3)
     logical :: success
     type(C_PTR) :: cusertype    
     type :: myptr
@@ -378,9 +378,9 @@ contains
     integer, pointer :: i
 
     ! Register a new user data type
-    fncs = (/ fluaL_Reg("userfunc", c_funloc(lua_userfunc)), &
-              fluaL_Reg("test",     c_funloc(lua_test)), &
-              fluaL_Reg("test2",    c_funloc(lua_test2)) /)
+    fncs = (/ FNCPTR("userfunc", c_funloc(lua_userfunc)), &
+              FNCPTR("test",     c_funloc(lua_test)), &
+              FNCPTR("test2",    c_funloc(lua_test2)) /)
     call flua_register_usertype(L, "testtype", fncs, .true.)
     
     ! Push a new user type onto the stack

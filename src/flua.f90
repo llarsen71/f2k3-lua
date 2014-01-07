@@ -26,10 +26,10 @@ module flua
     character(kind=C_CHAR, len=1), dimension(:), pointer :: str
   end type cStrPTR
 
-  type fluaL_Reg
+  type FNCPTR
     character*255  :: name
     type(C_FUNPTR) :: fn
-  end type fluaL_Reg
+  end type FNCPTR
 
   character*2 :: nwln = CHAR(13) // CHAR(10)
 
@@ -1556,7 +1556,7 @@ subroutine flua_register_usertype(L, typename, fncs, auto_index)
   implicit none
   type(C_PTR), value, intent(IN) :: L
   character(*) :: typename
-  type(fluaL_Reg) :: fncs(:)
+  type(FNCPTR) :: fncs(:)
   logical, optional :: auto_index
   logical :: auto_index_
   
@@ -1654,7 +1654,7 @@ subroutine flua_openlib(L, fncs, libname)
   use iso_c_binding
   implicit none
   type(C_PTR), value :: L
-  type(fluaL_Reg) :: fncs(:)
+  type(FNCPTR) :: fncs(:)
   character(*), optional :: libname
   !integer(type=c_int), optional :: nup
   integer :: i
