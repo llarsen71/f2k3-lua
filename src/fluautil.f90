@@ -9,6 +9,11 @@ MODULE fluautil
     procedure(push2stack_), PASS(this), pointer :: push2stack => NULL()
   end type PARAM
 
+  type fluautil_usertype
+    type(cStrPTR) :: typename
+    type(C_PTR)   :: cptr
+  end type fluautil_usertype
+
   abstract interface
     subroutine push2stack_(this, L)
       use iso_c_binding, only: c_ptr
@@ -19,7 +24,7 @@ MODULE fluautil
   end interface
 
   interface PRM
-    module procedure PRMint, PRMreal, PRMstr, PRMnil
+    module procedure PRMint, PRMreal, PRMstr, PRMnil, PRMusrt
   end interface
 
 CONTAINS
@@ -72,7 +77,7 @@ CONTAINS
   end function luaCall
 
 !=====================================================================
-! Parameters
+! Parameter: int
 !=====================================================================
 
   function PRMint(intval, copy)
@@ -112,6 +117,8 @@ CONTAINS
     call lua_pushInteger(L, i)
   end subroutine pushInt
 
+!=====================================================================
+! Parameter: real
 !=====================================================================
 
   function PRMreal(realval, copy) result(prm_)
@@ -154,6 +161,8 @@ CONTAINS
   end subroutine pushReal
 
 !=====================================================================
+! Parameter: string
+!=====================================================================
 
   function PRMstr(strval)
     implicit none
@@ -183,6 +192,8 @@ CONTAINS
     deallocate(strval)
   end subroutine pushStr
 
+!=====================================================================
+! Parameter: cfunction (cfn)
 !=====================================================================
 
   function PRMcfn(cfunc)
@@ -214,6 +225,8 @@ CONTAINS
   end subroutine pushcfn
 
 !=====================================================================
+! Parameter: nil
+!=====================================================================
 
   function PRMnil() result(NIL)
     implicit none
@@ -232,6 +245,39 @@ CONTAINS
 
     call lua_pushnil(L)
   end subroutine pushnil
+
+!=====================================================================
+! Parameter: usertype
+!=====================================================================
+
+  function PRMusrt(typename, cptr)
+    implicit none
+    character(*) :: typename
+    type(C_PTR)  :: cptr 
+    type(PARAM), pointer :: PRMusrt
+    type(fluautil_usertype), pointer :: usertype
+
+    allocate(usertype)
+    usertype%typename = cSTR(typename)
+    usertype%cptr = cptr
+    
+    allocate(PRMusrt)
+    PRMusrt%type = "ut"
+    PRMusrt%push2Stack => pushusrt
+    PRMusrt%val = C_LOC(usertype)
+  end function PRMusrt
+
+!=====================================================================
+
+  subroutine pushusrt(prm, L)
+    implicit none
+    class(PARAM) :: prm
+    type(C_PTR) :: L
+    type(fluautil_usertype), pointer :: usertype
+
+    call C_F_POINTER(prm%val, usertype)
+    call flua_push_usertype(L, cStr2FStr(usertype%typename), usertype%cptr)
+  end subroutine pushusrt
 
 !=====================================================================
 

@@ -370,11 +370,6 @@ contains
     implicit none
     type(FNCPTR) :: fncs(3)
     logical :: success
-    type(C_PTR) :: cusertype    
-    type :: myptr
-      type(C_PTR) :: ptr
-    end type myptr
-    type(myptr), pointer :: usertype
     integer, pointer :: i
 
     ! Register a new user data type
@@ -383,17 +378,13 @@ contains
               FNCPTR("test2",    c_funloc(lua_test2)) /)
     call flua_register_usertype(L, "testtype", fncs, .true.)
     
+    !-----------------------------------------------------------------
+    
     ! Push a new user type onto the stack
-    cusertype = flua_push_usertype(L, "testtype", sizeof(usertype))
-    
-    ! Cast to a fortran type
-    call c_f_pointer(cusertype, usertype)
-    
-    ! Initialize the data
     allocate(i)
     i = 10
-    usertype%ptr = C_LOC(i)
-    
+    call flua_push_usertype(L, "testtype", C_LOC(i))
+        
     ! Assign to a global variable 
     call lua_setglobal(L, "usertype")
     
@@ -409,21 +400,16 @@ contains
     if (.not.success) return
     call assert_equals(30, dummy, "dummy should have been set to 30")
     
+    !-----------------------------------------------------------------
+    
   end subroutine    
 
   subroutine lua_userfunc(lua)
     implicit none
     type(c_ptr), value :: lua
-    type(c_ptr) :: cusertype
-    type, bind(c) :: myptr
-      type(C_PTR) :: ptr
-    end type myptr
-    type(myptr), pointer :: usertype
     integer, pointer :: i
         
-    cusertype = flua_check_usertype(L, "testtype")
-    call c_f_pointer(cusertype, usertype)
-    call c_f_pointer(usertype%ptr, i)
+    call c_f_pointer(flua_check_usertype(L, "testtype"), i)
     i = 100
   end subroutine
 

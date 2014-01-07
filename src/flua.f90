@@ -2,7 +2,7 @@
 ! Licensed under the MIT license, see LICENSE file.
 
 module flua
-  use ISO_C_BINDING, only: C_CHAR, C_INT, C_FUNPTR
+  use ISO_C_BINDING, only: C_CHAR, C_INT, C_FUNPTR, C_PTR, C_NULL_PTR
   private :: p_characterToCharArray
   integer, PARAMETER :: LUA_MULTRET = -1
 
@@ -30,6 +30,10 @@ module flua
     character*255  :: name
     type(C_FUNPTR) :: fn
   end type FNCPTR
+  
+  type UserTypePTR
+    type(C_PTR) :: ptr = C_NULL_PTR
+  end type UserTypePTR
 
   character*2 :: nwln = CHAR(13) // CHAR(10)
 
@@ -1578,45 +1582,65 @@ end subroutine flua_register_usertype
 
 !=====================================================================
 
-function flua_push_usertype(L, typename, sz) result(usertype)
-  use ISO_C_BINDING, only: C_PTR, C_FUNPTR
+subroutine flua_push_usertype(L, typename, cptr)
+  use ISO_C_BINDING, only: C_PTR, C_FUNPTR, c_f_pointer, c_null_ptr
   implicit none
   type(C_PTR), value, intent(IN) :: L
   character(*) :: typename
-  integer :: sz
+  type(c_ptr), value :: cptr
   type(C_PTR) :: usertype
+  type(UserTypePTR), pointer :: pusertype
 
-  usertype = lua_newuserdata(L, sz)
+  ! Point to the actual fortran pointer item
+  usertype = lua_newuserdata(L, sizeof(pusertype))
+  call c_f_pointer(usertype, pusertype)  
+  pusertype%ptr = cptr
+  
+  ! Associate the usertype with metadata
   call fluaL_getmetatable(L, typename)
   call lua_setmetatable(L, -2)
-end function flua_push_usertype
+end subroutine flua_push_usertype
 
 !=====================================================================
 
 function flua_check_usertype(L, typename, idx) result(usertype)
-  use ISO_C_BINDING, only: C_PTR, C_FUNPTR, C_ASSOCIATED
+  use ISO_C_BINDING, only: C_PTR, C_FUNPTR, C_ASSOCIATED, C_F_POINTER
   implicit none
   type(C_PTR), value, intent(IN) :: L
   character(*) :: typename
   integer, optional :: idx
   type(C_PTR) :: usertype
+  type(UserTypePTR), pointer :: pusertype
   integer :: idx_
   character(len=1, kind=C_CHAR), dimension(LEN_TRIM(typename)+1) :: tn
   integer :: error
 
+  ! By default we assume that the first parameter is the usertype
   idx_ = 1
   if (PRESENT(idx)) idx_ = idx
 
+  ! If the indicated type is not a userdata, the raise and error
   if (.not.lua_isuserdata(L, idx_)) then
     call fluaL_typerror(L, idx_, "userdata-"//(typename))
     return
   endif
   
+  ! Verify that the metadata type is correct.
   call p_characterToCharArray(typename, tn, error)
+
+  ! Get the fortran pointer out of the userdata object
   usertype = luaL_checkudata(L, idx_, tn)
   if (.not.c_associated(usertype)) then
     call fluaL_typerror(L, idx_, "userdata-"//(typename))    
   endif
+  call c_f_pointer(usertype, pusertype)
+  
+  ! Set the actual userdata pointer and verify it is valid.
+  usertype = pusertype%ptr
+  if (.not.c_associated(usertype)) then
+    call fluaL_typerror(L, idx_, "userdata-"//(typename))    
+  endif
+  
 end function flua_check_usertype
 
 !=====================================================================

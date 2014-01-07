@@ -69,7 +69,10 @@ contains
     type(PARAM), pointer :: prm_
     integer i
     double precision d
+    character*50 :: str = ""
+    integer, pointer :: dat
 
+    ! Test PRMint
     prm_ => PRM(1)
     call prm_%push2Stack(L)
     if (lua_isnumber(L, -1)) then
@@ -88,17 +91,54 @@ contains
       call add_fail("An integer should have been pushed to the stack")
     end if
 
+    ! Test PRMreal
     prm_ => PRM(5.4)
     call prm_%push2Stack(L)
     if (lua_isnumber(L, -1)) then
       d = lua_tonumber(L, -1)
-      call assert_equals(5.4, real(d),"pushInt failed")
+      call assert_equals(5.4, real(d),"pushReal failed")
     else
-      call add_fail("An integer should have been pushed to the stack")
+      call add_fail("A real value should have been pushed to the stack")
     end if
+    
+    ! Test PRMstring
+    prm_ => PRM("this is a test")
+    call prm_%push2Stack(L)
+    if (lua_isstring(L, -1)) then
+      call flua_tostring(L, -1, str)
+      call assert_equals("this is a test", str, "pushStr failed")
+    else
+      call add_fail("A string should have been pushed to the stack")
+    end if
+    
+    ! Test PRMnil
+    prm_ => PRM()
+    call prm_%push2Stack(L)
+    if (.not.lua_isnil(L, -1)) then
+      call add_fail("A nil value should have been pushed to the stack")
+    end if
+        
+    ! Test PRMusrt
+    call flua_register_usertype(L, "prm_test", &
+        (/ FNCPTR("test", c_funloc(lua_test)) /))
+    allocate(dat)
+    dat = 5
+    prm_ => PRM("prm_test", C_LOC(dat))
+    call prm_%push2Stack(L)
+    if (.not.lua_isuserdata(L, -1)) then
+      call add_fail("A userdata should have been pushed to the stack")
+    end if
+    call c_f_pointer(flua_check_usertype(L, "prm_test", -1), dat)
+    call assert_equals(5,dat,"Should have returned the integer value pass to PRM")
+    deallocate(dat)
 
     continue
   end subroutine
+  
+  subroutine lua_test(lua)
+    implicit none
+    type(C_PTR), pointer :: lua
+  end subroutine lua_test
 
 !=====================================================================
 
