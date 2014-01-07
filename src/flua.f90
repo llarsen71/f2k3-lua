@@ -477,6 +477,28 @@ interface
   end function lua_error
   !
   !
+  !>LUALIB_API int luaL_typerror (lua_State *L, int narg, const char *tname)
+  function luaL_typerror(L, narg, tname) bind(C, name="luaL_typerror")
+    use ISO_C_BINDING, only: C_PTR, C_INT, C_CHAR
+    implicit none
+    type(C_PTR), value :: L
+    integer(kind=c_int), value :: narg
+    character(kind=C_CHAR, len=1), dimension(*) :: tname
+    integer(kind=c_int) :: luaL_typerror
+  end function luaL_typerror
+  !
+  !
+  !>LUALIB_API void *luaL_checkudata (lua_State *L, int ud, const char *tname)
+  function luaL_checkudata(L, narg, tname) bind(C, name="luaL_checkudata")
+    use ISO_C_BINDING, only: C_PTR, C_INT, C_CHAR
+    implicit none
+    type(C_PTR), value :: L
+    integer(kind=c_int), value :: narg
+    character(kind=C_CHAR, len=1), dimension(*) :: tname
+    type(C_PTR) :: luaL_checkudata
+  end function luaL_checkudata
+  !
+  !
   !>LUALIB_API int luaL_newmetatable (lua_State *L, const char *tname);
   function luaL_newmetatable(L, tname) bind(C, name="luaL_newmetatable")
     use ISO_C_BINDING, only: C_PTR, C_INT, C_CHAR
@@ -1101,6 +1123,17 @@ end function lua_isstring
 
 !=====================================================================
 
+function lua_isuserdata(L, n)
+  use ISO_C_BINDING, only: C_PTR
+  implicit none
+  type(C_PTR), intent(IN) :: L
+  integer, intent(IN) :: n
+  logical :: lua_isuserdata
+  !
+  lua_isuserdata = lua_isuserdata_c(L,  n) /= 0
+end function lua_isuserdata
+
+!=====================================================================
 function lua_tointeger(L, n)
   use ISO_C_BINDING, only: C_PTR
   implicit none
@@ -1239,6 +1272,21 @@ subroutine flua_error(L, msg)
   call lua_pushstring(L, msg)
   rslt = lua_error(L)
 end subroutine flua_error
+
+!=====================================================================
+
+subroutine fluaL_typerror(L, narg, tname)
+  use ISO_C_BINDING, only: C_PTR
+  implicit none
+  type(C_PTR), value :: L
+  integer :: narg
+  character(*) :: tname
+  character(len=1, kind=C_CHAR), dimension(LEN_TRIM(tname)+1) :: cname 
+  integer :: error
+  
+  call p_characterToCharArray(trim(tname), cname, error)
+  error = luaL_typerror(L, narg, cname)
+end subroutine fluaL_typerror
 
 !=====================================================================
 
@@ -1500,6 +1548,76 @@ subroutine flua_registerfunction(L, fnname, fn)
   ! Assign the function to a global name
   call lua_setglobal(L, fnname);
 end subroutine flua_registerfunction
+
+!=====================================================================
+
+subroutine flua_register_usertype(L, typename, fncs, auto_index)
+  use ISO_C_BINDING, only: C_PTR, C_FUNPTR
+  implicit none
+  type(C_PTR), value, intent(IN) :: L
+  character(*) :: typename
+  type(fluaL_Reg) :: fncs(:)
+  logical, optional :: auto_index
+  logical :: auto_index_
+  
+  auto_index_ = .true.
+  if (PRESENT(auto_index)) auto_index_ = auto_index
+  
+  ! Create the metatable and add functions to the metatable
+  call fluaL_newmetatable(L, typename)
+  call flua_openlib(L, fncs)
+  ! If auto_index is true, set the metatable as the item lookup table.
+  if (PRESENT(auto_index)) then
+    if (.not.auto_index) return
+    call lua_pushstring(L, "__index")
+    call lua_pushvalue(L, -2)
+    call lua_rawset(L, -3)
+  endif  
+  call lua_pop(L, 2)
+end subroutine flua_register_usertype
+
+!=====================================================================
+
+function flua_push_usertype(L, typename, sz) result(usertype)
+  use ISO_C_BINDING, only: C_PTR, C_FUNPTR
+  implicit none
+  type(C_PTR), value, intent(IN) :: L
+  character(*) :: typename
+  integer :: sz
+  type(C_PTR) :: usertype
+
+  usertype = lua_newuserdata(L, sz)
+  call fluaL_getmetatable(L, typename)
+  call lua_setmetatable(L, -2)
+end function flua_push_usertype
+
+!=====================================================================
+
+function flua_check_usertype(L, typename, idx) result(usertype)
+  use ISO_C_BINDING, only: C_PTR, C_FUNPTR, C_ASSOCIATED
+  implicit none
+  type(C_PTR), value, intent(IN) :: L
+  character(*) :: typename
+  integer, optional :: idx
+  type(C_PTR) :: usertype
+  integer :: idx_
+  character(len=1, kind=C_CHAR), dimension(LEN_TRIM(typename)+1) :: tn
+  integer :: error
+
+  idx_ = 1
+  if (PRESENT(idx)) idx_ = idx
+
+  if (.not.lua_isuserdata(L, idx_)) then
+    call fluaL_typerror(L, idx_, "userdata-"//(typename))
+    return
+  endif
+  
+  call p_characterToCharArray(typename, tn, error)
+  usertype = luaL_checkudata(L, idx_, tn)
+  if (.not.c_associated(usertype)) then
+    call fluaL_typerror(L, idx_, "userdata-"//(typename))    
+  endif
+end function flua_check_usertype
 
 !=====================================================================
 

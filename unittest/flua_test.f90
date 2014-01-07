@@ -24,6 +24,7 @@ contains
     call run_case(test_lua_pcall,          "test_lua_pcall")
     call run_case(test_checkStackTypes,    "test_checkStackTypes")
     call run_case(test_openlib,            "test_openlib")
+    call run_case(test_usertype,           "test_usertype")
   end subroutine flua_test_package
 
 !=====================================================================
@@ -338,9 +339,7 @@ contains
     success = fluaL_dostring(L, "mod.test(4)")
     call assert_equals(4, dummy, "The dummy value should have been set to 4 by lua call.")    
     success = fluaL_dostring(L, "mod.test2(4)")
-    call assert_equals(8, dummy, "The dummy value should have been set to 8 by lua call.")
-    
-    call fluaL_newmetatable(L, "mod")
+    call assert_equals(8, dummy, "The dummy value should have been set to 8 by lua call.")    
   end subroutine
 
   subroutine lua_test(lua)
@@ -364,6 +363,69 @@ contains
     if (.not.success) return
     dummy = lua_tointeger(lua, -1)*2
   end subroutine  
+
+!=====================================================================
+
+  subroutine test_usertype()
+    implicit none
+    type(fluaL_Reg) :: fncs(3)
+    logical :: success
+    type(C_PTR) :: cusertype    
+    type :: myptr
+      type(C_PTR) :: ptr
+    end type myptr
+    type(myptr), pointer :: usertype
+    integer, pointer :: i
+
+    ! Register a new user data type
+    fncs = (/ fluaL_Reg("userfunc", c_funloc(lua_userfunc)), &
+              fluaL_Reg("test",     c_funloc(lua_test)), &
+              fluaL_Reg("test2",    c_funloc(lua_test2)) /)
+    call flua_register_usertype(L, "testtype", fncs, .true.)
+    
+    ! Push a new user type onto the stack
+    cusertype = flua_push_usertype(L, "testtype", sizeof(usertype))
+    
+    ! Cast to a fortran type
+    call c_f_pointer(cusertype, usertype)
+    
+    ! Initialize the data
+    allocate(i)
+    i = 10
+    usertype%ptr = C_LOC(i)
+    
+    ! Assign to a global variable 
+    call lua_setglobal(L, "usertype")
+    
+    ! Call object oriented function on the usertype. Very that i goid changed to 100.
+    success = fluaL_dostring(L, "usertype:userfunc()")
+    call assert_true(success, "Failed to call usertype:userfunc()")
+    if (.not.success) return
+    call assert_equals(100, i, "The value of i should have changed to 100.")
+    
+    ! Call test function on usertype
+    success = fluaL_dostring(L, "usertype.test(30)")
+    call assert_true(success, "Failed to call usertype.test(30)")
+    if (.not.success) return
+    call assert_equals(30, dummy, "dummy should have been set to 30")
+    
+  end subroutine    
+
+  subroutine lua_userfunc(lua)
+    implicit none
+    type(c_ptr), value :: lua
+    type(c_ptr) :: cusertype
+    type, bind(c) :: myptr
+      type(C_PTR) :: ptr
+    end type myptr
+    type(myptr), pointer :: usertype
+    integer, pointer :: i
+        
+    cusertype = flua_check_usertype(L, "testtype")
+    call c_f_pointer(cusertype, usertype)
+    call c_f_pointer(usertype%ptr, i)
+    i = 100
+  end subroutine
 
 !=====================================================================
 
