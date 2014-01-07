@@ -471,9 +471,20 @@ interface
   !> LUA_API int lua_error (lua_State *L);
   function lua_error(L) bind(C, name="lua_error")
     use ISO_C_BINDING, only: C_PTR, C_INT
+    implicit none
     type(C_PTR), value :: L
     integer(kind=C_INT) :: lua_error
   end function lua_error
+  !
+  !
+  !>LUALIB_API int luaL_newmetatable (lua_State *L, const char *tname);
+  function luaL_newmetatable(L, tname) bind(C, name="luaL_newmetatable")
+    use ISO_C_BINDING, only: C_PTR, C_INT, C_CHAR
+    implicit none
+    type(C_PTR), value :: L
+    character(kind=C_CHAR, len=1), dimension(*) :: tname
+    integer(kind=C_INT) :: luaL_newmetatable    
+  end function luaL_newmetatable
 
   !===================================================================
   ! Get functions (Lua -> stack)
@@ -1175,7 +1186,8 @@ subroutine lua_newtable(L, tablename)
   use ISO_C_BINDING, only: C_PTR, C_CHAR
   implicit none
   type(C_PTR), intent(out) :: L
-  character(len=*), optional, intent(IN) :: tablename
+  character(*), optional :: tablename
+  integer :: error
 
   ! Add a new table to the stack.
   call lua_createtable(L, 0, 0)
@@ -1227,6 +1239,20 @@ subroutine flua_error(L, msg)
   call lua_pushstring(L, msg)
   rslt = lua_error(L)
 end subroutine flua_error
+
+!=====================================================================
+
+subroutine fluaL_newmetatable(L, name)
+  use ISO_C_BINDING, only: C_PTR
+  implicit none
+  type(C_PTR), value :: L
+  character(*) :: name
+  character(len=1, kind=C_CHAR), dimension(LEN_TRIM(name)+1) :: cname
+  integer :: error
+  
+  call p_characterToCharArray(trim(name), cname, error)
+  error = luaL_newmetatable(L, cname)
+end subroutine fluaL_newmetatable
  
 !=====================================================================
 
@@ -1264,6 +1290,18 @@ subroutine lua_setfield(L, idx, k)
   !
   call lua_setfield_c(L, idx, c_key)
 end subroutine lua_setfield
+
+!=====================================================================
+!
+!>#define luaL_getmetatable(L,n)	(lua_getfield(L, LUA_REGISTRYINDEX, (n)))
+subroutine fluaL_getmetatable(L, tname)
+  use ISO_C_BINDING, only: C_PTR
+  implicit none
+  type(C_PTR), value :: L
+  character(*) :: tname
+  
+  call lua_getfield(L, LUA_REGISTRYINDEX, tname)
+end subroutine fluaL_getmetatable
 
 !=====================================================================
 

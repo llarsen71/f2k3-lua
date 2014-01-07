@@ -339,6 +339,8 @@ contains
     call assert_equals(4, dummy, "The dummy value should have been set to 4 by lua call.")    
     success = fluaL_dostring(L, "mod.test2(4)")
     call assert_equals(8, dummy, "The dummy value should have been set to 8 by lua call.")
+    
+    call fluaL_newmetatable(L, "mod")
   end subroutine
 
   subroutine lua_test(lua)
