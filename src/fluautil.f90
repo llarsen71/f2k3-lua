@@ -50,9 +50,7 @@ CONTAINS
 
     if (PRESENT(params)) then
       n = size(params)
-      do i = 1, n
-        call params(i)%push2Stack(L)
-      end do
+      call PRM2Stack(L, params)
     else
       n = 0
     end if
@@ -63,7 +61,7 @@ CONTAINS
       nretvals_ = LUA_MULTRET
     end if
 
-    error = lua_pcall(L, n, nretvals_, 0)
+    error = lua_pcall(L, n, nretvals_)
     if (error == 0) then
       if (PRESENT(retvals)) then
         success = checkStackTypes(L, retvals)
@@ -75,6 +73,49 @@ CONTAINS
       success = .false.
     end if
   end function luaCall
+
+!=====================================================================
+
+  subroutine PRM2Stack(L, params)
+    implicit none
+    type(C_PTR), value    :: L
+    type(PARAM), optional :: params(:)
+    integer :: i, n
+  
+    n = size(params)
+    do i = 1, n
+      call params(i)%push2Stack(L)
+    end do      
+  end subroutine
+
+!=====================================================================
+
+  subroutine pushtable_items(L, params, idx)
+    implicit none
+    type(C_PTR), value    :: L
+    type(PARAM), optional :: params(:)
+    integer, optional     :: idx
+    integer :: i, n, idx_, idx2
+    
+!   If a table index wasn't passed in, push a table to the stack.
+    if (present(idx)) then
+      idx_ = idx
+    else
+      call lua_pushtable(L)
+      idx_ = -1
+    endif
+    
+!   If this is a negative index take into account that we will add
+!   key and value to the stack before pushing them to the table.
+    idx2 = idx_
+    if (idx2 < 0) idx2 = idx2 -2
+    
+    n = size(params)
+    do i = 1, n
+      call PRM2Stack(L, (/ PRM(i), params(i) /))
+      call lua_settable(L, idx2) ! set table[i] = params(i)
+    end do
+  end subroutine pushtable_items
 
 !=====================================================================
 ! Parameter: int
@@ -278,6 +319,38 @@ CONTAINS
     call C_F_POINTER(prm%val, usertype)
     call flua_push_usertype(L, cStr2FStr(usertype%typename), usertype%cptr)
   end subroutine pushusrt
+
+!=====================================================================
+! Parameter from the stack
+!=====================================================================
+
+  function PRMat(idx)
+    implicit none
+    integer :: idx
+    type(PARAM), pointer :: PRMat
+    integer, pointer :: idx_
+
+    allocate(idx_)
+    idx_ = idx
+
+    allocate(PRMat)
+    PRMat%type = "at"
+    PRMat%push2Stack => pushvalueat
+    PRMat%val = C_LOC(idx_)
+  end function PRMat
+
+!=====================================================================
+
+  subroutine pushvalueat(prm, L)
+    implicit none
+    class(PARAM) :: prm
+    type(C_PTR) :: L
+    integer, pointer :: idx
+
+    call C_F_POINTER(prm%val, idx)
+    call lua_pushvalue(L, idx)
+    deallocate(idx)
+  end subroutine pushvalueat
 
 !=====================================================================
 

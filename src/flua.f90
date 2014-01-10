@@ -22,6 +22,15 @@ module flua
   integer, PARAMETER :: LUA_TUSERDATA = 7
   integer, PARAMETER :: LUA_TTHREAD = 8
 
+  integer, PARAMETER :: LUA_GCSTOP = 0
+  integer, PARAMETER :: LUA_GCRESTART = 1
+  integer, PARAMETER :: LUA_GCCOLLECT = 2
+  integer, PARAMETER :: LUA_GCCOUNT = 3
+  integer, PARAMETER :: LUA_GCCOUNTB= 4
+  integer, PARAMETER :: LUA_GCSTEP = 5
+  integer, PARAMETER :: LUA_GCSETPAUSE =	6
+  integer, PARAMETER :: LUA_GCSETSTEPMUL = 7
+
   type cStrPTR
     character(kind=C_CHAR, len=1), dimension(:), pointer :: str
   end type cStrPTR
@@ -673,6 +682,15 @@ interface
     type(C_PTR) :: luaL_checklstring
   end function luaL_checklstring
   !
+  !
+  !> LUA_API int lua_gc (lua_State *L, int what, int data);
+  function lua_gc(L, what, dat) bind(c, name="lua_gc")
+    use ISO_C_BINDING, only:C_PTR, C_INT, C_SIZE_T
+    implicit none
+    type(C_PTR), value :: L
+    integer(C_INT), value :: what, dat
+    integer(C_INT) :: lua_gc
+  end function lua_gc
 end interface
 
 
@@ -681,7 +699,7 @@ CONTAINS
 !=====================================================================
 
   subroutine initDefaultErrfunc(L, errorlogger)
-    use ISO_C_BINDING, only: C_PTR
+    use ISO_C_BINDING, only: C_PTR, C_FUNLOC
     type(C_PTR), value :: L
     character*(*), optional :: errorlogger
     integer :: error
@@ -696,12 +714,31 @@ CONTAINS
       '  local f = assert(io.open("lua_error.log","a+"))' // nwln // &
       '  if f == nil then return end' // nwln // &
       '  for i, error in ipairs{...} do' // nwln // &
-      '    f:write(error)' // nwln // &
+      '    f:write(error.."\r\n")' // nwln // &
       '  end' // nwln // &
       '  f:close()' // nwln // &
+      '  flua_error_event()' // nwln // &
       'end', error)
+      
+      call flua_registerfunction(L, "flua_error_event", &
+                            C_FUNLOC(flua_error_event))
     end if
   end subroutine initDefaultErrfunc
+  
+!=====================================================================
+
+  function flua_error_event(L)
+  !
+  ! This is used for debugging error events. Basically just a place to
+  ! set a breakpoint.
+  !
+    use ISO_C_BINDING, only: C_PTR
+    type(C_PTR), value :: L
+    integer(kind=C_INT) :: flua_error_event
+    
+    flua_error_event = 0
+    continue    
+  end function flua_error_event
 
 !=====================================================================
 
@@ -1388,7 +1425,7 @@ subroutine luaL_dofile(L, fileName, error)
   ! TODO: report error string
   error = luaL_loadfile(L, cFileName)
   if (error == 0) then
-    error = lua_pcall(L, 0, LUA_MULTRET, 0)
+    error = lua_pcall(L, 0, LUA_MULTRET)
   else
     call handleError(L)
   endif
@@ -1566,18 +1603,19 @@ subroutine flua_register_usertype(L, typename, fncs, auto_index)
   
   auto_index_ = .true.
   if (PRESENT(auto_index)) auto_index_ = auto_index
-  
+    
   ! Create the metatable and add functions to the metatable
   call fluaL_newmetatable(L, typename)
   call flua_openlib(L, fncs)
   ! If auto_index is true, set the metatable as the item lookup table.
-  if (PRESENT(auto_index)) then
-    if (.not.auto_index) return
-    call lua_pushstring(L, "__index")
-    call lua_pushvalue(L, -2)
-    call lua_rawset(L, -3)
+  if (auto_index_) then
+    if (auto_index_) then
+      call lua_pushstring(L, "__index")
+      call lua_pushvalue(L, -2)
+      call lua_rawset(L, -3)
+    endif
   endif  
-  call lua_pop(L, 2)
+  call lua_pop(L, 1)
 end subroutine flua_register_usertype
 
 !=====================================================================
@@ -1600,6 +1638,36 @@ subroutine flua_push_usertype(L, typename, cptr)
   call fluaL_getmetatable(L, typename)
   call lua_setmetatable(L, -2)
 end subroutine flua_push_usertype
+
+!=====================================================================
+
+function flua_is_usertype(L, typename, idx) result(istype)
+  use ISO_C_BINDING, only: C_PTR, C_FUNPTR, C_ASSOCIATED, C_F_POINTER
+  implicit none
+  type(C_PTR), value, intent(IN) :: L
+  character(*) :: typename
+  integer, optional :: idx
+  logical :: istype
+  integer :: idx_
+  character(len=1, kind=C_CHAR), dimension(LEN_TRIM(typename)+1) :: tn
+  integer :: error
+
+  ! By default we assume that the first parameter is the usertype
+  idx_ = 1
+  if (PRESENT(idx)) idx_ = idx
+
+  istype = .FALSE.
+  ! If the indicated type is not a userdata, return false
+  if (.not.lua_isuserdata(L, idx_)) return
+  
+  ! Verify that the metadata type is correct.
+  call p_characterToCharArray(typename, tn, error)
+
+  ! Get the fortran pointer out of the userdata object
+  if (.not.c_associated(luaL_checkudata(L, idx_, tn))) return
+
+  istype = .TRUE.
+end function flua_is_usertype
 
 !=====================================================================
 
@@ -1724,13 +1792,20 @@ function getTblField(L, fieldname, type_, tableidx)
 
   ! default index is just above the fieldname that is
   ! added to the stack.
-  tblidx = -2
-  if (PRESENT(tableidx)) then
-    tblidx = tableidx-1
+  tblidx = -1
+  if (PRESENT(tableidx)) tblidx = tableidx
+
+  ! Verify that the item at tblidx is a table.
+  if (.not.lua_istable(L, tblidx)) then
+    getTblField = .FALSE.
+    return
   endif
 
   ! Put the field value on top of the stack
   call lua_pushstring(L, fieldname)
+  
+  ! Account for the string that was just put on the stack
+  if (tblidx < 0) tblidx = tblidx -1
   call lua_gettable(L, tblidx)
 
   if (PRESENT(type_)) then
@@ -1743,6 +1818,44 @@ function getTblField(L, fieldname, type_, tableidx)
 
   getTblField = .TRUE.
 end function getTblField
+
+!=====================================================================
+
+function getTblItem(L, idx, type_, tableidx)
+  use ISO_C_BINDING, only: C_PTR
+  implicit none
+  type(C_PTR), value, intent(IN) :: L
+  integer :: idx 
+  integer, optional :: type_, tableidx
+  logical :: getTblItem
+  integer tblidx
+
+  ! default index is just above the fieldname that is
+  ! added to the stack.
+  tblidx = -1
+  if (PRESENT(tableidx)) tblidx = tableidx
+
+  ! Verify that the item at tblidx is a table.
+  if (.not.lua_istable(L, tblidx)) then
+    getTblItem = .FALSE.
+    return
+  endif
+
+  ! Put the field value on top of the stack
+  call lua_pushinteger(L, idx)
+  if (tblidx < 0) tblidx = tblidx - 1
+  call lua_gettable(L, tblidx)
+  
+  if (PRESENT(type_)) then
+    if (lua_type(L, -1) /= type_) then
+      call lua_pop(L, 1)
+      getTblItem = .FALSE.
+      return
+    endif
+  endif
+
+  getTblItem = .FALSE.
+end function getTblItem
 
 !=====================================================================
 
