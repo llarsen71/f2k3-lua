@@ -39,7 +39,7 @@ module flua
     character*255  :: name
     type(C_FUNPTR) :: fn
   end type FNCPTR
-  
+
   type UserTypePTR
     type(C_PTR) :: ptr = C_NULL_PTR
   end type UserTypePTR
@@ -518,7 +518,7 @@ interface
     implicit none
     type(C_PTR), value :: L
     character(kind=C_CHAR, len=1), dimension(*) :: tname
-    integer(kind=C_INT) :: luaL_newmetatable    
+    integer(kind=C_INT) :: luaL_newmetatable
   end function luaL_newmetatable
 
   !===================================================================
@@ -719,12 +719,12 @@ CONTAINS
       '  f:close()' // nwln // &
       '  flua_error_event()' // nwln // &
       'end', error)
-      
+
       call flua_registerfunction(L, "flua_error_event", &
                             C_FUNLOC(flua_error_event))
     end if
   end subroutine initDefaultErrfunc
-  
+
 !=====================================================================
 
   function flua_error_event(L)
@@ -735,9 +735,9 @@ CONTAINS
     use ISO_C_BINDING, only: C_PTR
     type(C_PTR), value :: L
     integer(kind=C_INT) :: flua_error_event
-    
+
     flua_error_event = 0
-    continue    
+    continue
   end function flua_error_event
 
 !=====================================================================
@@ -1261,7 +1261,6 @@ subroutine lua_newtable(L, tablename)
   implicit none
   type(C_PTR), value :: L
   character(*), optional :: tablename
-  integer :: error
 
   ! Add a new table to the stack.
   call lua_createtable(L, 0, 0)
@@ -1302,14 +1301,14 @@ subroutine lua_pushcfunction(L, fn)
 end subroutine lua_pushcfunction
 
 !=====================================================================
- 
+
 subroutine flua_error(L, msg)
   use ISO_C_BINDING, only: C_PTR
   implicit none
   type(C_PTR), value :: L
   character(*) :: msg
   integer :: rslt
-  
+
   call lua_pushstring(L, msg)
   rslt = lua_error(L)
 end subroutine flua_error
@@ -1322,9 +1321,9 @@ subroutine fluaL_typerror(L, narg, tname)
   type(C_PTR), value :: L
   integer :: narg
   character(*) :: tname
-  character(len=1, kind=C_CHAR), dimension(LEN_TRIM(tname)+1) :: cname 
+  character(len=1, kind=C_CHAR), dimension(LEN_TRIM(tname)+1) :: cname
   integer :: error
-  
+
   call p_characterToCharArray(trim(tname), cname, error)
   error = luaL_typerror(L, narg, cname)
 end subroutine fluaL_typerror
@@ -1338,11 +1337,11 @@ subroutine fluaL_newmetatable(L, name)
   character(*) :: name
   character(len=1, kind=C_CHAR), dimension(LEN_TRIM(name)+1) :: cname
   integer :: error
-  
+
   call p_characterToCharArray(trim(name), cname, error)
   error = luaL_newmetatable(L, cname)
 end subroutine fluaL_newmetatable
- 
+
 !=====================================================================
 
 subroutine lua_getfield(L, n, k)
@@ -1388,7 +1387,7 @@ subroutine fluaL_getmetatable(L, tname)
   implicit none
   type(C_PTR), value :: L
   character(*) :: tname
-  
+
   call lua_getfield(L, LUA_REGISTRYINDEX, tname)
 end subroutine fluaL_getmetatable
 
@@ -1576,6 +1575,17 @@ end subroutine luaL_checkstring
 
 !=====================================================================
 
+function flua_equal(L, idx1, idx2)
+  implicit none
+  type(C_PTR) :: L
+  integer :: idx1, idx2
+  logical :: flua_equal
+
+  flua_equal = (lua_equal(L, idx1, idx2) == 1)
+end function flua_equal
+
+!=====================================================================
+
 subroutine flua_registerfunction(L, fnname, fn)
   use ISO_C_BINDING, only: C_PTR, C_FUNPTR
   implicit none
@@ -1600,10 +1610,10 @@ subroutine flua_register_usertype(L, typename, fncs, auto_index)
   type(FNCPTR) :: fncs(:)
   logical, optional :: auto_index
   logical :: auto_index_
-  
+
   auto_index_ = .true.
   if (PRESENT(auto_index)) auto_index_ = auto_index
-    
+
   ! Create the metatable and add functions to the metatable
   call fluaL_newmetatable(L, typename)
   call flua_openlib(L, fncs)
@@ -1614,7 +1624,7 @@ subroutine flua_register_usertype(L, typename, fncs, auto_index)
       call lua_pushvalue(L, -2)
       call lua_rawset(L, -3)
     endif
-  endif  
+  endif
   call lua_pop(L, 1)
 end subroutine flua_register_usertype
 
@@ -1631,9 +1641,9 @@ subroutine flua_push_usertype(L, typename, cptr)
 
   ! Point to the actual fortran pointer item
   usertype = lua_newuserdata(L, sizeof(pusertype))
-  call c_f_pointer(usertype, pusertype)  
+  call c_f_pointer(usertype, pusertype)
   pusertype%ptr = cptr
-  
+
   ! Associate the usertype with metadata
   call fluaL_getmetatable(L, typename)
   call lua_setmetatable(L, -2)
@@ -1659,7 +1669,7 @@ function flua_is_usertype(L, typename, idx) result(istype)
   istype = .FALSE.
   ! If the indicated type is not a userdata, return false
   if (.not.lua_isuserdata(L, idx_)) return
-  
+
   ! Verify that the metadata type is correct.
   call p_characterToCharArray(typename, tn, error)
 
@@ -1692,23 +1702,23 @@ function flua_check_usertype(L, typename, idx) result(usertype)
     call fluaL_typerror(L, idx_, "userdata-"//(typename))
     return
   endif
-  
+
   ! Verify that the metadata type is correct.
   call p_characterToCharArray(typename, tn, error)
 
   ! Get the fortran pointer out of the userdata object
   usertype = luaL_checkudata(L, idx_, tn)
   if (.not.c_associated(usertype)) then
-    call fluaL_typerror(L, idx_, "userdata-"//(typename))    
+    call fluaL_typerror(L, idx_, "userdata-"//(typename))
   endif
   call c_f_pointer(usertype, pusertype)
-  
+
   ! Set the actual userdata pointer and verify it is valid.
   usertype = pusertype%ptr
   if (.not.c_associated(usertype)) then
-    call fluaL_typerror(L, idx_, "userdata-"//(typename))    
+    call fluaL_typerror(L, idx_, "userdata-"//(typename))
   endif
-  
+
 end function flua_check_usertype
 
 !=====================================================================
@@ -1750,7 +1760,6 @@ subroutine flua_openlib(L, fncs, libname)
   character(*), optional :: libname
   !integer(type=c_int), optional :: nup
   integer :: i
-  type(cStrPTR) :: name
   logical :: success
 
   if (PRESENT(libname)) then
@@ -1803,7 +1812,7 @@ function getTblField(L, fieldname, type_, tableidx)
 
   ! Put the field value on top of the stack
   call lua_pushstring(L, fieldname)
-  
+
   ! Account for the string that was just put on the stack
   if (tblidx < 0) tblidx = tblidx -1
   call lua_gettable(L, tblidx)
@@ -1821,14 +1830,14 @@ end function getTblField
 
 !=====================================================================
 
-function getTblItem(L, idx, type_, tableidx)
+function getTblItem(L, table_item, type_, tableidx) result(success)
   use ISO_C_BINDING, only: C_PTR
   implicit none
   type(C_PTR), value, intent(IN) :: L
-  integer :: idx 
+  integer :: table_item
   integer, optional :: type_, tableidx
-  logical :: getTblItem
-  integer tblidx
+  logical :: success
+  integer :: tblidx, wastype
 
   ! default index is just above the fieldname that is
   ! added to the stack.
@@ -1837,27 +1846,70 @@ function getTblItem(L, idx, type_, tableidx)
 
   ! Verify that the item at tblidx is a table.
   if (.not.lua_istable(L, tblidx)) then
-    getTblItem = .FALSE.
+    success = .FALSE.
     return
   endif
 
   ! Put the field value on top of the stack
-  call lua_pushinteger(L, idx)
+  call lua_pushinteger(L, table_item)
   if (tblidx < 0) tblidx = tblidx - 1
   call lua_gettable(L, tblidx)
-  
+
   if (PRESENT(type_)) then
-    if (lua_type(L, -1) /= type_) then
+    wastype = lua_type(L, -1)
+    if (wastype /= type_) then
       call lua_pop(L, 1)
-      getTblItem = .FALSE.
+      success = .FALSE.
       return
     endif
   endif
 
-  getTblItem = .FALSE.
+  success = .TRUE.
 end function getTblItem
 
 !=====================================================================
+
+function getTblItems(L, table_items, types_, tableidx) result(success)
+  use ISO_C_BINDING, only: C_PTR
+  implicit none
+  type(C_PTR), value, intent(IN) :: L
+  integer :: table_items(:)
+  integer, optional :: types_(:)
+  integer, optional :: tableidx
+  logical :: success
+  integer tblidx, i
+
+  ! default index is just above the fieldname that is
+  ! added to the stack.
+  tblidx = -1
+  if (PRESENT(tableidx)) tblidx = tableidx
+
+  ! Verify that the item at tblidx is a table.
+  if (.not.lua_istable(L, tblidx)) then
+    success = .FALSE.
+    return
+  endif
+
+  do i = 1, size(table_items)
+    if (PRESENT(types_)) then
+      success = getTblItem(L, table_items(i), types_(i), tblidx)
+    else
+      success = getTblItem(L, table_items(i), tableidx=tblidx)
+    endif
+    if (.not.success) then
+      if (i>1) call lua_pop(L, i-1)
+      return
+    endif
+
+!   Since we are adding items to the stack we need to move table index
+    if (tblidx < 0) tblidx = tblidx - 1
+  end do
+
+  success = .TRUE.
+end function getTblItems
+
+!=====================================================================
+
 
 function checkStackTypes(L, types) result(ismatch)
 !

@@ -40,7 +40,7 @@ CONTAINS
     type(PARAM), optional :: params(:)
     integer, optional     :: retvals(:)
     logical :: success
-    integer :: i, n, error, nretvals_
+    integer :: n, error, nretvals_
 
     call luaL_dostring(L, "return "//fncname, error)
     if (error /= 0) then
@@ -81,22 +81,23 @@ CONTAINS
     type(C_PTR), value    :: L
     type(PARAM), optional :: params(:)
     integer :: i, n
-  
+
     n = size(params)
     do i = 1, n
       call params(i)%push2Stack(L)
-    end do      
+    end do
   end subroutine
 
 !=====================================================================
 
-  subroutine pushtable_items(L, params, idx)
+  subroutine pushtable_items(L, params, idx, start_at)
     implicit none
     type(C_PTR), value    :: L
     type(PARAM), optional :: params(:)
     integer, optional     :: idx
-    integer :: i, n, idx_, idx2
-    
+    integer, optional     :: start_at
+    integer :: i, n, idx_, start_at_
+
 !   If a table index wasn't passed in, push a table to the stack.
     if (present(idx)) then
       idx_ = idx
@@ -104,16 +105,18 @@ CONTAINS
       call lua_pushtable(L)
       idx_ = -1
     endif
-    
+
+    start_at_ = 1
+    if (present(start_at)) start_at_ = start_at
+
 !   If this is a negative index take into account that we will add
 !   key and value to the stack before pushing them to the table.
-    idx2 = idx_
-    if (idx2 < 0) idx2 = idx2 -2
-    
+    if (idx_ < 0) idx_ = idx_-2
+
     n = size(params)
-    do i = 1, n
-      call PRM2Stack(L, (/ PRM(i), params(i) /))
-      call lua_settable(L, idx2) ! set table[i] = params(i)
+    do i = 0, n-1
+      call PRM2Stack(L, (/ PRM(start_at_ + i), params(i+1) /))
+      call lua_settable(L, idx_) ! set table[i] = params(i)
     end do
   end subroutine pushtable_items
 
@@ -257,13 +260,15 @@ CONTAINS
     type(C_FUNPTR), pointer :: cfn
 
     call C_F_POINTER(prm%val, cfn)
-    call pushcfn_(cfn)
-  contains
-    subroutine pushcfn_(fn)
-      type(C_FUNPTR) :: fn
-      call lua_pushcfunction(L, fn)
-    end subroutine
+    call pushcfn_(L, cfn)
   end subroutine pushcfn
+
+  subroutine pushcfn_(L, fn)
+    implicit none
+    type(C_PTR) :: L
+    type(C_FUNPTR) :: fn
+    call lua_pushcfunction(L, fn)
+  end subroutine
 
 !=====================================================================
 ! Parameter: nil
@@ -294,14 +299,14 @@ CONTAINS
   function PRMusrt(typename, cptr)
     implicit none
     character(*) :: typename
-    type(C_PTR)  :: cptr 
+    type(C_PTR)  :: cptr
     type(PARAM), pointer :: PRMusrt
     type(fluautil_usertype), pointer :: usertype
 
     allocate(usertype)
     usertype%typename = cSTR(typename)
     usertype%cptr = cptr
-    
+
     allocate(PRMusrt)
     PRMusrt%type = "ut"
     PRMusrt%push2Stack => pushusrt

@@ -14,8 +14,9 @@ contains
   subroutine flua_util_test_package()
     implicit none
 
-    call run_case(test_PRM,     "test_PRM")
-    call run_case(test_luaCall, "test_luaCall")
+    call run_case(test_PRM,             "test_PRM")
+    call run_case(test_luaCall,         "test_luaCall")
+    call run_case(test_pushtable_items, "test_pushtable_items")
   end subroutine flua_util_test_package
 
 !=====================================================================
@@ -100,7 +101,7 @@ contains
     else
       call add_fail("A real value should have been pushed to the stack")
     end if
-    
+
     ! Test PRMstring
     prm_ => PRM("this is a test")
     call prm_%push2Stack(L)
@@ -110,14 +111,14 @@ contains
     else
       call add_fail("A string should have been pushed to the stack")
     end if
-    
+
     ! Test PRMnil
     prm_ => PRM()
     call prm_%push2Stack(L)
     if (.not.lua_isnil(L, -1)) then
       call add_fail("A nil value should have been pushed to the stack")
     end if
-        
+
     ! Test PRMusrt
     call flua_register_usertype(L, "prm_test", &
         (/ FNCPTR("test", c_funloc(lua_test)) /))
@@ -134,7 +135,7 @@ contains
 
     continue
   end subroutine
-  
+
   subroutine lua_test(lua)
     implicit none
     type(C_PTR), pointer :: lua
@@ -177,5 +178,63 @@ contains
       end if
     end if
   end subroutine
+
+!=====================================================================
+
+  subroutine test_pushtable_items()
+    implicit none
+    logical :: success
+    type(PARAM), pointer :: prms(:)
+
+    call pushtable_items(L, (/ PRM(4), PRM("test"), PRM(3) /))
+    call assert_true(getTblItems(L, (/ 1, 2, 3 /), &
+                     (/ LUA_TNUMBER, LUA_TSTRING, LUA_TNUMBER /)), &
+                     "Type mismatch for pushtable_items")
+
+    call assert_true(stackEquals((/ PRM(4), PRM("test"), PRM(3) /)), &
+      "Item set by pushtable_items not correct")
+    call lua_settop(L, 1)
+
+    allocate(prms(2))
+    prms = (/ PRM("bob"), PRM(2) /)
+    call pushtable_items(L, prms, 1, 3)
+
+    call assert_true(getTblItems(L, (/ 1, 2, 3, 4 /), &
+                     (/ LUA_TNUMBER, LUA_TSTRING, LUA_TSTRING, LUA_TNUMBER /)), &
+                     "Type mismatch for pushtable_items")
+
+    call assert_true(stackEquals((/ PRM(4), PRM("test"), PRM("bob"), PRM(2) /)), &
+      "Item set by pushtable_items not correct")
+    call lua_settop(L, 1)
+  end subroutine
+
+!=====================================================================
+
+  function stackEquals(prms, startat) result(isequal)
+    implicit none
+    type(PARAM) :: prms(:)
+    integer, optional :: startat
+    integer :: i, startat_, offset
+    logical :: isequal
+
+    startat_ = -size(prms)
+    if (PRESENT(startat)) startat_ = startat
+
+!   If this is a negative index take into account that we will add item to
+!   stack.
+    offset = 1
+    if (startat_ < 0) offset = 2
+
+    isequal = .false.
+    do i = 1, size(prms)
+      call prms(i)%push2stack(L)
+      if(.not.flua_equal(L, -1, startat_-offset+i)) then
+        call lua_pop(L, 1)
+        return
+      endif
+      call lua_pop(L, 1)
+    end do
+    isequal = .true.
+  end function
 
 end module flua_util_test
