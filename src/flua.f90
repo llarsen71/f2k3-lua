@@ -898,6 +898,11 @@ subroutine C_F_CSTR(cptr, ret, length, as_cSTR)
     end function strlen
   end interface
 
+  if (.not.c_associated(CPTR)) then
+    ret => NULL()
+    length = 0
+    return
+  endif
   length = strlen(CPTR)
   if (PRESENT(as_cSTR)) then
     if (as_cSTR) then
@@ -913,11 +918,11 @@ end subroutine C_F_CSTR
 
 !=====================================================================
 
-subroutine flua_tostring(L, n, str)
+subroutine flua_tostring(L, idx, str)
   use ISO_C_BINDING, only: C_PTR, C_SIZE_T, C_CHAR
   implicit none
   type(C_PTR), intent(IN) :: L
-  integer, intent(IN) :: n
+  integer, intent(IN) :: idx
   character(len=*), intent(out) :: str
   !
   type(C_PTR) :: cstr_
@@ -926,7 +931,7 @@ subroutine flua_tostring(L, n, str)
   integer :: i, cstrLength
 
   str = ""
-  cstr_ = lua_tolstring(L, n, length)
+  cstr_ = lua_tolstring(L, idx, length)
   call C_F_CSTR(cstr_, fstr, cstrLength)
   !
   do i = 1, cstrLength
@@ -1209,7 +1214,7 @@ subroutine lua_pushinteger(L, val)
   integer, intent(IN) :: val
   double precision :: valD
   !
-  valD = val
+  valD = DBLE(val)
   call lua_pushnumber(L, valD)
 end subroutine lua_pushinteger
 
@@ -1378,6 +1383,18 @@ subroutine lua_setfield(L, idx, k)
   !
   call lua_setfield_c(L, idx, c_key)
 end subroutine lua_setfield
+
+!=====================================================================
+
+function flua_getmetatable(L, idx) result(success)
+  use ISO_C_BINDING, only: C_PTR
+  implicit none
+  type(C_PTR), value :: L
+  integer :: idx
+  logical :: success
+
+  success = (lua_getmetatable(L, idx) /= 0)
+end function flua_getmetatable
 
 !=====================================================================
 !
