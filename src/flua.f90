@@ -32,7 +32,7 @@ module flua
   integer, PARAMETER :: LUA_GCSETSTEPMUL = 7
 
   type cStrPTR
-    character(kind=C_CHAR, len=1), dimension(:), pointer :: str
+    character(kind=C_CHAR, len=1), dimension(:), pointer :: str => NULL()
   end type cStrPTR
 
   type FNCPTR
@@ -852,7 +852,7 @@ function cSTR2fSTR(cstr_, dealloc) result(fstr)
   if (PRESENT(dealloc)) then
     dealloc_ = dealloc
   endif
-  if (dealloc_) then
+  if (dealloc_ .and. associated(cstr_%str)) then
     deallocate(cstr_%str)
   endif
 end function cSTR2fSTR

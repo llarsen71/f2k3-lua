@@ -183,7 +183,6 @@ contains
 
   subroutine test_pushtable_items()
     implicit none
-    logical :: success
     type(PARAM), pointer :: prms(:)
 
     call pushtable_items(L, (/ PRM(4), PRM("test"), PRM(3) /))

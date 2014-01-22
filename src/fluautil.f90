@@ -3,9 +3,11 @@ MODULE fluautil
   use flua
   implicit none
 
+! The PARAM structure is used to create parameter arrays for calling lua
+! functions (via luaCall), for pushing values to tables (via push_tableitems).
   type PARAM
-    type(C_PTR) :: val = C_NULL_PTR
-    character*2 :: type
+    type(C_PTR)   :: val = C_NULL_PTR
+    character*2   :: type
     procedure(push2stack_), PASS(this), pointer :: push2stack => NULL()
   end type PARAM
 
@@ -24,7 +26,7 @@ MODULE fluautil
   end interface
 
   interface PRM
-    module procedure PRMint, PRMreal, PRMstr, PRMnil, PRMusrt
+    module procedure PRMint, PRMreal, PRMstr, PRMcstr, PRMnil, PRMusrt
   end interface
 
 CONTAINS
@@ -84,7 +86,7 @@ CONTAINS
 
     n = size(params)
     do i = 1, n
-      call params(i)%push2Stack(L)
+        call params(i)%push2Stack(L)
     end do
   end subroutine
 
@@ -109,8 +111,8 @@ CONTAINS
     start_at_ = 1
     if (present(start_at)) start_at_ = start_at
 
-!   If this is a negative index take into account that we will add
-!   key and value to the stack before pushing them to the table.
+!       If this is a negative index take into account that we will add
+!       key and value to the stack before pushing them to the table.
     if (idx_ < 0) idx_ = idx_-2
 
     n = size(params)
@@ -235,6 +237,26 @@ CONTAINS
     call lua_pushstring(L, cSTR2fSTR(strval))
     deallocate(strval)
   end subroutine pushStr
+
+!=====================================================================
+! Parameter: cstring
+!=====================================================================
+
+  function PRMcstr(strval)
+    implicit none
+    type(cStrPTR) :: strval
+    type(PARAM), pointer :: PRMcstr
+    type(cStrPTR), pointer :: strval_
+
+    allocate(strval_)
+    strval_%str => strval_%str
+
+    allocate(PRMcstr)
+    PRMcstr%type = "s"
+    PRMcstr%val = C_LOC(strval_)
+    ! Use the pushStr subroutine since the data is the same as PRMstr
+    PRMcstr%push2Stack => pushStr
+  end function PRMcstr
 
 !=====================================================================
 ! Parameter: cfunction (cfn)
