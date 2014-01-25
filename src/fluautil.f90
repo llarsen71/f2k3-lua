@@ -9,6 +9,7 @@ MODULE fluautil
     type(C_PTR)   :: val = C_NULL_PTR
     character*2   :: type
     procedure(push2stack_), PASS(this), pointer :: push2stack => NULL()
+    procedure(dealloc_), PASS(this), pointer :: dealloc => NULL()
   end type PARAM
 
   type fluautil_usertype
@@ -23,10 +24,19 @@ MODULE fluautil
       class(PARAM) :: this
       type(c_ptr) :: L
     end subroutine
+    subroutine dealloc_(this)
+      import :: PARAM
+      class(PARAM) :: this
+    end subroutine
   end interface
 
   interface PRM
-    module procedure PRMint, PRMreal, PRMstr, PRMcstr, PRMnil, PRMusrt
+    module procedure PRMint, PRMreal, PRMstr, PRMcstr, PRMusrt, PRMtbl, &
+      PRMTblItem
+  end interface
+
+  interface TblPRM
+    module procedure PRMTblItem
   end interface
 
 CONTAINS
@@ -126,29 +136,21 @@ CONTAINS
 ! Parameter: int
 !=====================================================================
 
-  function PRMint(intval, copy)
+  function PRMint(intval) result(prm_)
     implicit none
     integer, target :: intval
-    logical, optional :: copy
-    type(PARAM), pointer :: PRMint
+    type(PARAM), pointer :: prm_
     logical copy_
     integer, pointer :: intval_
 
-    copy_ = .true.
-    if (PRESENT(copy)) then
-      copy_ = copy
-    end if
-    if (copy_) then
-      allocate(intval_)
-      intval_ = intval
-    else
-      intval_ => intval
-    endif
+    allocate(intval_)
+    intval_ = intval
 
-    allocate(PRMint)
-    PRMint%type = "i"
-    PRMint%push2Stack => pushInt
-    PRMint%val = C_LOC(intval_)
+    allocate(prm_)
+    prm_%type = "i"
+    prm_%val = C_LOC(intval_)
+    prm_%push2Stack => pushInt
+    prm_%dealloc => deallocInt
   end function PRMint
 
 !=====================================================================
@@ -159,32 +161,39 @@ CONTAINS
     type(C_PTR) :: L
     integer, pointer :: i
 
+    ! Should an error be raised here?
+    if (.not.c_associated(prm%val)) return
     call C_F_POINTER(prm%val, i)
     call lua_pushInteger(L, i)
+    call prm%dealloc()
   end subroutine pushInt
+
+!=====================================================================
+
+  subroutine deallocInt(prm)
+    implicit none
+    class(PARAM) :: prm
+    integer, pointer :: i
+
+    ! Should an error be raised here?
+    if (.not.c_associated(prm%val)) return
+    call C_F_POINTER(prm%val, i)
+    deallocate(i)
+  end subroutine deallocInt
 
 !=====================================================================
 ! Parameter: real
 !=====================================================================
 
-  function PRMreal(realval, copy) result(prm_)
+  function PRMreal(realval) result(prm_)
     implicit none
     real, target :: realval
-    logical, optional :: copy
     type(PARAM), pointer :: prm_
     logical copy_
     real, pointer :: realval_
 
-    copy_ = .true.
-    if (PRESENT(copy)) then
-      copy_ = copy
-    end if
-    if (copy_) then
-      allocate(realval_)
-      realval_ = realval
-    else
-      realval_ => realval
-    endif
+    allocate(realval_)
+    realval_ = realval
 
     allocate(prm_)
     prm_%type = "r"
@@ -201,28 +210,44 @@ CONTAINS
     real, pointer :: r
     double precision :: d
 
+    ! Should an error be raised here?
+    if (.not.c_associated(prm%val)) return
     call C_F_POINTER(prm%val, r)
     d = r
     call lua_pushNumber(L, d)
   end subroutine pushReal
 
 !=====================================================================
+
+  subroutine deallocReal(prm)
+    implicit none
+    class(PARAM) :: prm
+    real, pointer :: realval_
+
+    ! Should an error be raised here?
+    if (.not.c_associated(prm%val)) return
+    call C_F_POINTER(prm%val, realval_)
+    deallocate(realval_)
+  end subroutine deallocReal
+
+!=====================================================================
 ! Parameter: string
 !=====================================================================
 
-  function PRMstr(strval)
+  function PRMstr(strval) result(prm_)
     implicit none
     character*(*) :: strval
-    type(PARAM), pointer :: PRMstr
+    type(PARAM), pointer :: prm_
     type(cStrPTR), pointer :: strval_
 
     allocate(strval_)
     strval_ = cSTR(strval, .FALSE.)
 
-    allocate(PRMstr)
-    PRMstr%type = "s"
-    PRMstr%push2Stack => pushStr
-    PRMstr%val = C_LOC(strval_)
+    allocate(prm_)
+    prm_%type = "s"
+    prm_%val = C_LOC(strval_)
+    prm_%push2Stack => pushStr
+    prm_%dealloc => deallocStr
   end function PRMstr
 
 !=====================================================================
@@ -233,44 +258,62 @@ CONTAINS
     type(C_PTR) :: L
     type(cStrPTR), pointer :: strval
 
+    ! Should an error be raised here?
+    if (.not.c_associated(prm%val)) return
     call C_F_POINTER(prm%val, strval)
     call lua_pushstring(L, cSTR2fSTR(strval))
-    deallocate(strval)
+    call prm%dealloc()
   end subroutine pushStr
+
+!=====================================================================
+
+  subroutine deallocStr(prm)
+    implicit none
+    class(PARAM) :: prm
+    type(cStrPTR), pointer :: strval
+
+    ! Should an error be raised here?
+    if (.not.c_associated(prm%val)) return
+    call C_F_POINTER(prm%val, strval)
+    call dealloc_cSTR(strval)
+    deallocate(strval)
+  end subroutine deallocStr
 
 !=====================================================================
 ! Parameter: cstring
 !=====================================================================
 
-  function PRMcstr(strval)
+  function PRMcstr(strval) result(prm_)
     implicit none
     type(cStrPTR) :: strval
-    type(PARAM), pointer :: PRMcstr
+    type(PARAM), pointer :: prm_
     type(cStrPTR), pointer :: strval_
 
     allocate(strval_)
     strval_%str => strval_%str
 
-    allocate(PRMcstr)
-    PRMcstr%type = "s"
-    PRMcstr%val = C_LOC(strval_)
+    allocate(prm_)
+    prm_%type = "s"
+    prm_%val = C_LOC(strval_)
     ! Use the pushStr subroutine since the data is the same as PRMstr
-    PRMcstr%push2Stack => pushStr
+    prm_%push2Stack => pushStr
+    prm_%dealloc => deallocStr
   end function PRMcstr
 
 !=====================================================================
 ! Parameter: cfunction (cfn)
 !=====================================================================
 
-  function PRMcfn(cfunc)
+  function PRMcfn(cfunc) result(prm_)
     implicit none
     type(C_FUNPTR), target :: cfunc
-    type(PARAM), pointer :: PRMcfn
+    type(PARAM), pointer :: prm_
 
-    allocate(PRMcfn)
-    PRMcfn%type = "fn"
-    PRMcfn%push2Stack => pushcfn
-    PRMcfn%val = C_LOC(cfunc)
+    allocate(prm_)
+    prm_%type = "fn"
+    prm_%val = C_LOC(cfunc)
+    prm_%push2Stack => pushcfn
+    prm_%dealloc => dealloc_cfn
   end function PRMcfn
 
 !=====================================================================
@@ -281,6 +324,8 @@ CONTAINS
     type(C_PTR) :: L
     type(C_FUNPTR), pointer :: cfn
 
+    ! Should an error be raised here?
+    if (.not.c_associated(prm%val)) return
     call C_F_POINTER(prm%val, cfn)
     call pushcfn_(L, cfn)
   end subroutine pushcfn
@@ -293,26 +338,11 @@ CONTAINS
   end subroutine
 
 !=====================================================================
-! Parameter: nil
-!=====================================================================
 
-  function PRMnil() result(NIL)
-    implicit none
-    type(PARAM), pointer :: NIL
-    allocate(NIL)
-    NIL%type = "nl"
-    NIL%push2Stack => pushnil
-  end function PRMnil
-
-!=====================================================================
-
-  subroutine pushnil(prm, L)
+  subroutine dealloc_cfn(prm)
     implicit none
     class(PARAM) :: prm
-    type(C_PTR) :: L
-
-    call lua_pushnil(L)
-  end subroutine pushnil
+  end subroutine dealloc_cfn
 
 !=====================================================================
 ! Parameter: usertype
@@ -343,9 +373,125 @@ CONTAINS
     type(C_PTR) :: L
     type(fluautil_usertype), pointer :: usertype
 
+    ! Should an error be raised here?
+    if (.not.c_associated(prm%val)) return
     call C_F_POINTER(prm%val, usertype)
     call flua_push_usertype(L, cStr2FStr(usertype%typename), usertype%cptr)
   end subroutine pushusrt
+
+!=====================================================================
+! Parameter to Add Table
+!=====================================================================
+
+  function PRMTbl() result(prm_)
+    implicit none
+    type(PARAM), pointer :: prm_
+
+    allocate(prm_)
+    prm_%type = "tb"
+    prm_%push2stack => pushTableParam
+  end function PRMTbl
+
+!=====================================================================
+
+  subroutine pushTableParam(prm, L)
+    implicit none
+    class(PARAM) :: prm
+    type(C_PTR) :: L
+
+    call lua_pushtable(L)
+  end subroutine pushTableParam
+
+!=====================================================================
+! Parameters to Add Table Items
+!=====================================================================
+
+  function PRMTblItem(key_or_val, val, tbl_idx) result(prm_)
+    implicit none
+    type kv
+      type(PARAM), pointer :: key => NULL()
+      type(PARAM), pointer :: val => NULL()
+      integer :: tbl_idx
+    end type kv
+    type(PARAM), pointer :: key_or_val
+    type(PARAM), pointer, optional :: val
+    integer, optional :: tbl_idx
+    type(PARAM), pointer :: prm_
+    type(kv), pointer :: kvptr
+
+    allocate(kvptr)
+    if (PRESENT(val)) then
+      kvptr%key => key_or_val
+      kvptr%val => val
+    else
+      kvptr%val => key_or_val
+    endif
+
+!   0 is used to indicate that value was not set.
+    kvptr%tbl_idx = 0
+    if (PRESENT(tbl_idx)) kvptr%tbl_idx = tbl_idx
+
+    allocate(prm_)
+    prm_%type = "ti"
+    prm_%push2stack => pushTableItemParam
+  end function PRMTblItem
+
+!=====================================================================
+
+  subroutine pushTableItemParam(prm, L)
+    implicit none
+    type kv
+      type(PARAM), pointer :: key => NULL()
+      type(PARAM), pointer :: val => NULL()
+      integer :: tbl_idx
+    end type kv
+    class(PARAM) :: prm
+    type(C_PTR) :: L
+    integer, pointer :: idx
+    type(kv), pointer :: kvptr
+
+    ! Should an error be raised here?
+    if (.not.c_associated(prm%val)) return
+    call C_F_POINTER(prm%val, kvptr)
+    if (kvptr%tbl_idx == 0) then
+!     If no table index was given, and the top of the stack is
+!     not a table, add one that we can add items to.
+      if (.not.lua_istable(L, -1)) then
+        call lua_pushtable(L)
+      endif
+      kvptr%tbl_idx = -1
+    else
+
+    endif
+    call lua_pushtable(L)
+    deallocate(idx)
+  end subroutine pushTableItemParam
+
+!*********************************************************************
+! Parameters that are NOT part of the PRM interface
+!*********************************************************************
+
+!=====================================================================
+! Parameter: nil
+!=====================================================================
+
+  function PRMnil() result(NIL)
+    implicit none
+    type(PARAM), pointer :: NIL
+    allocate(NIL)
+    NIL%type = "nl"
+    NIL%push2Stack => pushnil
+  end function PRMnil
+
+!=====================================================================
+
+  subroutine pushnil(prm, L)
+    implicit none
+    class(PARAM) :: prm
+    type(C_PTR) :: L
+
+    call lua_pushnil(L)
+  end subroutine pushnil
 
 !=====================================================================
 ! Parameter from the stack
@@ -374,6 +520,8 @@ CONTAINS
     type(C_PTR) :: L
     integer, pointer :: idx
 
+    ! Should an error be raised here?
+    if (.not.c_associated(prm%val)) return
     call C_F_POINTER(prm%val, idx)
     call lua_pushvalue(L, idx)
     deallocate(idx)

@@ -83,7 +83,7 @@ contains
       call add_fail("An integer should have been pushed to the stack")
     end if
 
-    prm_ => PRM(2, .FALSE.)
+    prm_ => PRM(2)
     call prm_%push2Stack(L)
     if (lua_isnumber(L, -1)) then
       i = lua_tointeger(L, -1)
@@ -115,8 +115,8 @@ contains
     ! Test PRMnil
     prm_ => PRM()
     call prm_%push2Stack(L)
-    if (.not.lua_isnil(L, -1)) then
-      call add_fail("A nil value should have been pushed to the stack")
+    if (.not.lua_istable(L, -1)) then
+      call add_fail("A table value should have been pushed to the stack")
     end if
 
     ! Test PRMusrt

@@ -852,10 +852,21 @@ function cSTR2fSTR(cstr_, dealloc) result(fstr)
   if (PRESENT(dealloc)) then
     dealloc_ = dealloc
   endif
-  if (dealloc_ .and. associated(cstr_%str)) then
-    deallocate(cstr_%str)
+  if (dealloc_) then
+    call dealloc_cSTr(cstr_)
   endif
 end function cSTR2fSTR
+
+!=====================================================================
+
+subroutine dealloc_cSTR(cstr_)
+  implicit none
+  type(cStrPTR) :: cstr_
+
+  if (associated(cstr_%str)) then
+    deallocate(cstr_%str)
+  endif
+end subroutine dealloc_cSTR
 
 !=====================================================================
 
