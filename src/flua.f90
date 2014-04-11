@@ -28,7 +28,7 @@ module flua
   integer, PARAMETER :: LUA_GCCOUNT = 3
   integer, PARAMETER :: LUA_GCCOUNTB= 4
   integer, PARAMETER :: LUA_GCSTEP = 5
-  integer, PARAMETER :: LUA_GCSETPAUSE =	6
+  integer, PARAMETER :: LUA_GCSETPAUSE =  6
   integer, PARAMETER :: LUA_GCSETSTEPMUL = 7
 
   type cStrPTR
@@ -350,7 +350,7 @@ interface
   end function lua_tocfunction
   !
   !
-  !> LUA_API void	       *(lua_touserdata) (lua_State *L, int idx);
+  !> LUA_API void        *(lua_touserdata) (lua_State *L, int idx);
   function lua_touserdata(L, idx) bind(C, name="lua_touserdata")
     use ISO_C_BINDING
     implicit none
@@ -416,8 +416,16 @@ interface
   !  ! int or long.
   !  integer(kind=C_LONG), value :: n
   !end subroutine
-
-!> LUA_API void  (lua_pushlstring) (lua_State *L, const char *s, size_t len);
+  !
+  !
+  !> LUA_API void  (lua_pushlstring) (lua_State *L, const char *s, size_t len);
+  subroutine lua_pushlstring_c(L, str, sz) bing(C, name="lua_pushlstring")
+    use ISO_C_BINDING, only:C_CHAR, C_PTR, C_SIZE_T
+    implicit none
+    type(C_PTR), value :: L
+    type(C_PTR), value :: str
+    integer(kind=C_SIZE_T), value :: sz
+  end subroutine lua_pushlstring_c
 !> LUA_API const char *(lua_pushvfstring) (lua_State *L, const char *fmt, va_list argp);
 !> LUA_API const char *(lua_pushfstring) (lua_State *L, const char *fmt, ...);
 
@@ -1041,7 +1049,7 @@ end function flua_checkglobal
 ! Access function (stack -> fortran) MACROS
 !=====================================================================
 
-!#define lua_isfunction(L,n)	(lua_type(L, (n)) == LUA_TFUNCTION)
+!#define lua_isfunction(L,n)  (lua_type(L, (n)) == LUA_TFUNCTION)
 function lua_isfunction(L, n)
   use ISO_C_BINDING, only: C_PTR
   implicit none
@@ -1054,7 +1062,7 @@ end function lua_isfunction
 
 !=====================================================================
 
-!#define lua_istable(L,n)	(lua_type(L, (n)) == LUA_TTABLE)
+!#define lua_istable(L,n) (lua_type(L, (n)) == LUA_TTABLE)
 function lua_istable(L, n)
   use ISO_C_BINDING, only: C_PTR
   implicit none
@@ -1067,7 +1075,7 @@ end function lua_istable
 
 !=====================================================================
 
-!#define lua_islightuserdata(L,n)	(lua_type(L, (n)) == LUA_TLIGHTUSERDATA)
+!#define lua_islightuserdata(L,n) (lua_type(L, (n)) == LUA_TLIGHTUSERDATA)
 function lua_islightuserdata(L, n)
   use ISO_C_BINDING, only: C_PTR
   implicit none
@@ -1080,7 +1088,7 @@ end function lua_islightuserdata
 
 !=====================================================================
 
-!#define lua_isnil(L,n)		(lua_type(L, (n)) == LUA_TNIL)
+!#define lua_isnil(L,n)   (lua_type(L, (n)) == LUA_TNIL)
 function lua_isnil(L, n)
   use ISO_C_BINDING, only: C_PTR
   implicit none
@@ -1093,7 +1101,7 @@ end function lua_isnil
 
 !=====================================================================
 
-!#define lua_isboolean(L,n)	(lua_type(L, (n)) == LUA_TBOOLEAN)
+!#define lua_isboolean(L,n) (lua_type(L, (n)) == LUA_TBOOLEAN)
 function lua_isboolean(L, n)
   use ISO_C_BINDING, only: C_PTR
   implicit none
@@ -1106,7 +1114,7 @@ end function
 
 !=====================================================================
 
-!#define lua_isthread(L,n)	(lua_type(L, (n)) == LUA_TTHREAD)
+!#define lua_isthread(L,n)  (lua_type(L, (n)) == LUA_TTHREAD)
 function lua_isthread(L, n)
   use ISO_C_BINDING, only: C_PTR
   implicit none
@@ -1119,7 +1127,7 @@ end function
 
 !=====================================================================
 
-!#define lua_isnone(L,n)		(lua_type(L, (n)) == LUA_TNONE)
+!#define lua_isnone(L,n)    (lua_type(L, (n)) == LUA_TNONE)
 function lua_isnone(L, n)
   use ISO_C_BINDING, only: C_PTR
   implicit none
@@ -1132,7 +1140,7 @@ end function
 
 !=====================================================================
 
-!#define lua_isnoneornil(L, n)	(lua_type(L, (n)) <= 0)
+!#define lua_isnoneornil(L, n)  (lua_type(L, (n)) <= 0)
 function lua_isnoneornil(L, n)
   use ISO_C_BINDING, only: C_PTR
   implicit none
@@ -1260,7 +1268,7 @@ end subroutine lua_pushtable
 
 !=====================================================================
 
-!> #define lua_newtable(L)		lua_createtable(L, 0, 0)
+!> #define lua_newtable(L) lua_createtable(L, 0, 0)
 subroutine lua_newtable(L, tablename)
   use ISO_C_BINDING, only: C_PTR, C_CHAR
   implicit none
@@ -1398,7 +1406,7 @@ end function flua_getmetatable
 
 !=====================================================================
 !
-!>#define luaL_getmetatable(L,n)	(lua_getfield(L, LUA_REGISTRYINDEX, (n)))
+!>#define luaL_getmetatable(L,n)  (lua_getfield(L, LUA_REGISTRYINDEX, (n)))
 subroutine fluaL_getmetatable(L, tname)
   use ISO_C_BINDING, only: C_PTR
   implicit none
@@ -1564,7 +1572,7 @@ end subroutine stackDump
 
 !=====================================================================
 
-!#define luaL_checkstring(L,n)	(luaL_checklstring(L, (n), NULL))
+!#define luaL_checkstring(L,n)  (luaL_checklstring(L, (n), NULL))
 subroutine luaL_checkstring(L, n, fstr, error)
   use ISO_C_BINDING, only: C_PTR, C_CHAR, C_NULL_PTR
   implicit none
